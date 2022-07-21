@@ -24,13 +24,14 @@
  */
 
 import { BulletShape } from './bullet-shape';
-import { warnID } from '../../../core';
+import { assert, warnID } from '../../../core';
 import { Mesh } from '../../../3d/assets';
 import { MeshCollider } from '../../../../exports/physics-framework';
 import { cocos2BulletVec3, cocos2BulletTriMesh } from '../bullet-utils';
 import { ITrimeshShape } from '../../spec/i-physics-shape';
 import { BulletCache } from '../bullet-cache';
 import { bt } from '../instantiated';
+import { BulletTriangleMesh } from '../bullet-triangle-mesh';
 
 export class BulletTrimeshShape extends BulletShape implements ITrimeshShape {
     public get collider () {
@@ -66,6 +67,7 @@ export class BulletTrimeshShape extends BulletShape implements ITrimeshShape {
     }
 
     private refBtTriangleMesh: Bullet.ptr = 0;
+    private triangleMesh!: BulletTriangleMesh;
 
     onComponentSet () {
         this.setMesh(this.collider.mesh);
@@ -73,6 +75,7 @@ export class BulletTrimeshShape extends BulletShape implements ITrimeshShape {
 
     onDestroy () {
         if (this.refBtTriangleMesh) { bt.TriangleMesh_del(this.refBtTriangleMesh); }
+        if (this.triangleMesh) { this.triangleMesh.reference = false; }
         super.onDestroy();
     }
 
@@ -85,8 +88,14 @@ export class BulletTrimeshShape extends BulletShape implements ITrimeshShape {
     }
 
     private _getBtTriangleMesh (mesh: Mesh): Bullet.ptr {
-        this.refBtTriangleMesh = bt.TriangleMesh_new();
-        cocos2BulletTriMesh(this.refBtTriangleMesh, mesh);
-        return this.refBtTriangleMesh;
+        // this.refBtTriangleMesh = bt.TriangleMesh_new();
+        // cocos2BulletTriMesh(this.refBtTriangleMesh, mesh);
+        // return this.refBtTriangleMesh;
+
+        this.triangleMesh = BulletTriangleMesh.getBulletTriangleMesh(mesh._uuid, mesh);
+        if (!this.triangleMesh.bulletTriangleMeshInternal) {
+            console.warn('BulletTrimeshShape::_getBtTriangleMesh() return null');
+        }
+        return this.triangleMesh.bulletTriangleMeshInternal;
     }
 }
