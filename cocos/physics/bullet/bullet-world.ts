@@ -39,7 +39,7 @@ import { IVec3Like } from '../../core/math/type-define';
 import { BulletContactData } from './bullet-contact-data';
 import { BulletConstraint } from './constraints/bullet-constraint';
 import { fastRemoveAt } from '../../core/utils/array';
-import { bt } from './instantiated';
+import { bt, EBulletType } from './instantiated';
 
 const contactsPool: BulletContactData[] = [];
 const v3_0 = CC_V3_0;
@@ -117,10 +117,11 @@ export class BulletWorld implements IPhysicsWorld {
 
     destroy (): void {
         if (this.constraints.length || this.bodies.length) error('You should destroy all physics component first.');
-        bt.CollisionWorld_del(this._world);
-        bt.DbvtBroadphase_del(this._broadphase);
-        bt.CollisionDispatcher_del(this._dispatcher);
-        bt.SequentialImpulseConstraintSolver_del(this._solver);
+        bt._safe_delete(this._world, EBulletType.EBulletTypeCollisionWorld);
+        bt._safe_delete(this._broadphase, EBulletType.EBulletTypeDbvtBroadPhase);
+        bt._safe_delete(this._dispatcher, EBulletType.EBulletTypeCollisionDispatcher);
+        bt._safe_delete(this._solver, EBulletType.EBulletTypeSequentialImpulseConstraintSolver);
+
         (this as any).bodies = null;
         (this as any).ghosts = null;
         (this as any).constraints = null;

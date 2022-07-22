@@ -33,7 +33,7 @@ import { IVec3Like } from '../../../core/math/type-define';
 import { BulletSharedBody } from '../bullet-shared-body';
 import { AABB, Sphere } from '../../../core/geometry';
 import { BulletCache, CC_V3_0 } from '../bullet-cache';
-import { bt } from '../instantiated';
+import { bt, EBulletType } from '../instantiated';
 import { EColliderType } from '../../framework';
 
 const v3_0 = CC_V3_0;
@@ -152,11 +152,11 @@ export abstract class BulletShape implements IBaseShape {
     onDestroy () {
         this._sharedBody.reference = false;
         (this._collider as any) = null;
-        bt.Quat_del(this.quat);
-        bt.Transform_del(this.transform);
-        if (this._compound) bt.CollisionShape_del(this._compound);
+        bt._safe_delete(this.quat, EBulletType.EBulletTypeQuat);
+        bt._safe_delete(this.transform, EBulletType.EBulletTypeTransform);
+        if (this._compound) bt._safe_delete(this._compound, EBulletType.EBulletTypeCollisionShape);
         if (BulletCache.isNotEmptyShape(this._impl)) {
-            bt.CollisionShape_del(this._impl);
+            bt._safe_delete(this._impl, EBulletType.EBulletTypeCollisionShape);
             BulletCache.delWrapper(this._impl, BulletShape.TYPE);
         }
     }

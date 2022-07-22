@@ -39,6 +39,24 @@ if (globalThis.BULLET) {
 
 if (!physics.selector.runInEditor) bulletLibs = () => ({});
 
+//corresponds to bulletType in bullet-compile
+export enum EBulletType
+    {
+    EBulletTypeVec3 = 0,
+    EBulletTypeQuat,
+    EBulletTypeTransform,
+    EBulletTypeMotionState,
+    EBulletTypeCollisionObject,
+    EBulletTypeCollisionShape,
+    EBulletTypeStridingMeshInterface,
+    EBulletTypeTriangleMesh,
+    EBulletTypeCollisionDispatcher,
+    EBulletTypeDbvtBroadPhase,
+    EBulletTypeSequentialImpulseConstraintSolver,
+    EBulletTypeCollisionWorld,
+    EBulletTypeTypedConstraint
+}
+
 interface instanceExt extends Bullet.instance {
     CACHE: any,
     BODY_CACHE_NAME: string,
