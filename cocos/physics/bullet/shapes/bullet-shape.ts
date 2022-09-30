@@ -27,7 +27,7 @@ import { Vec3 } from '../../../core/math';
 import { Collider, PhysicsMaterial, PhysicsSystem } from '../../../../exports/physics-framework';
 import { BulletWorld } from '../bullet-world';
 import { EBtSharedBodyDirty } from '../bullet-enum';
-import { cocos2BulletQuat, cocos2BulletVec3 } from '../bullet-utils';
+import { cocos2BulletQuat, cocos2BulletVec3, bullet2CocosVec3 } from '../bullet-utils';
 import { IBaseShape } from '../../spec/i-physics-shape';
 import { IVec3Like } from '../../../core/math/type-define';
 import { BulletSharedBody } from '../bullet-shared-body';
@@ -57,9 +57,13 @@ export abstract class BulletShape implements IBaseShape {
     }
 
     setCenter (v: IVec3Like) {
+        Vec3.copy(this.center, v);
         Vec3.copy(v3_0, v);
         v3_0.multiply(this._collider.node.worldScale);
         cocos2BulletVec3(bt.Transform_getOrigin(this.transform), v3_0);
+        const test = new Vec3();
+        bullet2CocosVec3<Vec3>(test, bt.Transform_getOrigin(this.transform));
+        console.log(this.id, 'setCenter', v, test);
         this.updateCompoundTransform();
     }
 
@@ -91,9 +95,10 @@ export abstract class BulletShape implements IBaseShape {
     protected _impl: Bullet.ptr = 0;
     protected _compound: Bullet.ptr = 0;
     protected readonly quat = bt.Quat_new(0, 0, 0, 1);
-    protected readonly transform = bt.Transform_new();
+    public transform = bt.Transform_new();
     protected _collider!: Collider;
     protected _sharedBody!: BulletSharedBody;
+    public center = new Vec3();
 
     getAABB (v: AABB) {
         const bt_transform = BulletCache.instance.BT_TRANSFORM_0;

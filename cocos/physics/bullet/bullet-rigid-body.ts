@@ -57,7 +57,45 @@ export class BulletRigidBody implements IRigidBody {
 
     setMass (value: number) {
         if (!this._rigidBody.isDynamic) return;
+        const isCompound = bt.RigidBody_IsCollisionShapeCompound(this.impl);
+        const childShapeNumb = bt.RigidBody_getCollisionShapeNumb(this.impl);
+        console.log('isCompound', isCompound);
+        console.log('childShapeNumb', childShapeNumb);
+
         bt.RigidBody_setMass(this.impl, value);
+
+        const bt_centerofMassOffset = bt.RigidBody_getCenterOfMassOffset(this.impl);
+        const centerOfMassOffset = new Vec3();
+        bullet2CocosVec3(centerOfMassOffset, bt_centerofMassOffset);
+        console.log('centerOfMassOffset', centerOfMassOffset);
+
+        console.log('setMass()');
+        for (let i = 0; i < childShapeNumb; i++) {
+            const btCompoundPtr = bt.CollisionObject_getCollisionShape(this.impl);
+            const childPos = new Vec3();
+            const childPosbt = bt.CompoundShape_getChildShapeLocalPosition(btCompoundPtr, i);
+            bullet2CocosVec3(childPos, childPosbt);
+            console.log('old childPos ', i, childPos.x, childPos.y, childPos.z);
+            //now shold be related to new mass of center
+            if (this._sharedBody.bulletShapeArray[i]) {
+                const childPosOriginal =  this._sharedBody.bulletShapeArray[i].center.clone();
+                Vec3.subtract(childPosOriginal, childPosOriginal, centerOfMassOffset);
+                cocos2BulletVec3(childPosbt, childPosOriginal);
+                console.log('new childPos ', i, childPosOriginal.x, childPosOriginal.y, childPosOriginal.z);
+
+                const childPosbt1 = bt.CompoundShape_getChildShapeLocalPosition(btCompoundPtr, i);
+                bullet2CocosVec3(childPos, childPosbt1);
+                console.log('new bt childPos ', i, childPos.x, childPos.y, childPos.z);
+            } else {
+                console.log('this._sharedBody.bulletShapeArray[', i, '] is empty');
+            }
+        }
+
+        const bt_centerofMassTransform = bt.RigidBody_getCenterOfMassTransform(this.impl);
+        const centerOfMassWorldPosition = new Vec3();
+        bullet2CocosVec3(centerOfMassWorldPosition, bt.Transform_getOrigin(bt_centerofMassTransform));
+        console.log('centerOfMassWorldPosition', centerOfMassWorldPosition);
+
         this._wakeUpIfSleep();
         this._sharedBody.dirty |= EBtSharedBodyDirty.BODY_RE_ADD;
     }
@@ -133,6 +171,33 @@ export class BulletRigidBody implements IRigidBody {
 
     constructor () {
         this.id = BulletRigidBody.idCounter++;
+    }
+    update? (dt: number): void {
+        throw new Error('Method not implemented.');
+    }
+    lateUpdate? (dt: number): void {
+        throw new Error('Method not implemented.');
+    }
+    __preload? (component: any): void {
+        throw new Error('Method not implemented.');
+    }
+    onLoad? (): void {
+        throw new Error('Method not implemented.');
+    }
+    start? (): void {
+        throw new Error('Method not implemented.');
+    }
+    onFocusInEditor? (): void {
+        throw new Error('Method not implemented.');
+    }
+    onLostFocusInEditor? (): void {
+        throw new Error('Method not implemented.');
+    }
+    resetInEditor? (): void {
+        throw new Error('Method not implemented.');
+    }
+    onRestore? (): void {
+        throw new Error('Method not implemented.');
     }
 
     clearState (): void {

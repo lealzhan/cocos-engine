@@ -24,7 +24,7 @@
  */
 
 import { TransformBit } from '../../core/scene-graph/node-enum';
-import { Node } from '../../core';
+import { Node, Vec3, Quat } from '../../core';
 import { BulletWorld } from './bullet-world';
 import { BulletRigidBody } from './bullet-rigid-body';
 import { BulletShape } from './shapes/bullet-shape';
@@ -65,7 +65,7 @@ export class BulletSharedBody {
             BulletSharedBody.sharedBodesMap.set(node.uuid, newSB);
         }
         if (wrappedBody) {
-            newSB._wrappedBody = wrappedBody;
+            newSB.bulletRigidBody = wrappedBody;
             const g = wrappedBody.rigidBody.group;
             const m = PhysicsSystem.instance.collisionMatrix[g];
             newSB._collisionFilterGroup = g;
@@ -75,7 +75,7 @@ export class BulletSharedBody {
     }
 
     get wrappedBody () {
-        return this._wrappedBody;
+        return this.bulletRigidBody;
     }
 
     get bodyCompoundShape () {
@@ -137,7 +137,9 @@ export class BulletSharedBody {
     private ghostIndex = -1;
     private _bodyStruct!: IBulletBodyStruct;
     private _ghostStruct!: IBulletGhostStruct;
-    private _wrappedBody: BulletRigidBody | null = null;
+    private bulletRigidBody: BulletRigidBody | null = null;
+
+    public bulletShapeArray: BulletShape[] = [];
 
     /**
      * add or remove from world \
@@ -202,8 +204,8 @@ export class BulletSharedBody {
     private _instantiateBodyStruct () {
         if (this._bodyStruct) return;
         let mass = 0;
-        if (this._wrappedBody && this._wrappedBody.rigidBody.enabled && this._wrappedBody.rigidBody.isDynamic) {
-            mass = this._wrappedBody.rigidBody.mass;
+        if (this.bulletRigidBody && this.bulletRigidBody.rigidBody.enabled && this.bulletRigidBody.rigidBody.isDynamic) {
+            mass = this.bulletRigidBody.rigidBody.mass;
         }
 
         const trans = BulletCache.instance.BT_TRANSFORM_0;
@@ -221,7 +223,7 @@ export class BulletSharedBody {
         };
         BulletCache.setWrapper(this.id, bt.BODY_CACHE_NAME, this);
         if (this._ghostStruct) bt.CollisionObject_setIgnoreCollisionCheck(this.ghost, this.body, true);
-        if (this._wrappedBody) this.setBodyType(this._wrappedBody.rigidBody.type);
+        if (this.bulletRigidBody) this.setBodyType(this.bulletRigidBody.rigidBody.type);
     }
 
     private _instantiateGhostStruct () {
@@ -232,7 +234,7 @@ export class BulletSharedBody {
         bt.CollisionObject_setCollisionFlags(ghost, btCollisionFlags.CF_STATIC_OBJECT | btCollisionFlags.CF_NO_CONTACT_RESPONSE);
         this._ghostStruct = { id: IDCounter++, ghost, compound: ghostShape, wrappedShapes: [] };
         if (this._bodyStruct) bt.CollisionObject_setIgnoreCollisionCheck(this.body, this.ghost, true);
-        if (this._wrappedBody) this.setGhostType(this._wrappedBody.rigidBody.type);
+        if (this.bulletRigidBody) this.setGhostType(this.bulletRigidBody.rigidBody.type);
     }
 
     setType (v: ERigidBodyType) {
@@ -241,9 +243,9 @@ export class BulletSharedBody {
     }
 
     setBodyType (v: ERigidBodyType) {
-        if (this._bodyStruct && this._wrappedBody) {
+        if (this._bodyStruct && this.bulletRigidBody) {
             const body = this._bodyStruct.body;
-            const wrap = this._wrappedBody;
+            const wrap = this.bulletRigidBody;
             const com = wrap.rigidBody;
             let m_bcf = bt.CollisionObject_getCollisionFlags(body);
             const localInertia = BulletCache.instance.BT_V3_0;
@@ -303,11 +305,18 @@ export class BulletSharedBody {
     }
 
     addShape (v: BulletShape, isTrigger: boolean) {
+        console.log('bullet-shared-body addShape', v);
+        console.log('bullet-shared-body addShape ', v.collider.node.name);
+        this.bulletShapeArray.push(v);
+        const test = new Vec3();
+        bullet2CocosVec3<Vec3>(test, bt.Transform_getOrigin(v.transform));
+        console.log('addShape', v, test);
+
         function switchShape (that: BulletSharedBody, shape: Bullet.ptr) {
             bt.CollisionObject_setCollisionShape(that.body, shape);
             that.dirty |= EBtSharedBodyDirty.BODY_RE_ADD;
-            if (that._wrappedBody && that._wrappedBody.isEnabled) {
-                that._wrappedBody.setMass(that._wrappedBody.rigidBody.mass);
+            if (that.bulletRigidBody && that.bulletRigidBody.isEnabled) {
+                that.bulletRigidBody.setMass(that.bulletRigidBody.rigidBody.mass);
             }
         }
 
@@ -340,9 +349,18 @@ export class BulletSharedBody {
                 this.bodyEnabled = true;
             }
         }
+
+        if (this.bulletRigidBody) {
+            this.bulletRigidBody.setMass(this.bulletRigidBody.rigidBody.mass);
+        }
     }
 
     removeShape (v: BulletShape, isTrigger: boolean) {
+        const index = this.bulletShapeArray.indexOf(v, 0);
+        if (index > -1) {
+            this.bulletShapeArray.splice(index, 1);
+        }
+
         if (isTrigger) {
             const index = this.ghostStruct.wrappedShapes.indexOf(v);
             if (index >= 0) {
@@ -395,12 +413,25 @@ export class BulletSharedBody {
     }
 
     syncSceneToPhysics () {
-        if (this.node.hasChangedFlags) {
+        if (1) { //this.node.hasChangedFlags) {
+            console.log(this.node.name, 'syncSceneToPhysics node world pos', this.node.worldPosition);
             const bt_quat = BulletCache.instance.BT_QUAT_0;
-            const bt_transform = bt.CollisionObject_getWorldTransform(this.body);
+            // const bt_transform = bt.CollisionObject_getWorldTransform(this.body);
+            const bt_transform = bt.RigidBody_getCenterOfMassTransform(this.body);
             cocos2BulletQuat(bt_quat, this.node.worldRotation);
-            cocos2BulletVec3(bt.Transform_getOrigin(bt_transform), this.node.worldPosition);
             bt.Transform_setRotation(bt_transform, bt_quat);
+
+            // cocos2BulletVec3(bt.Transform_getOrigin(bt_transform), this.node.worldPosition);
+            const centerOfMassOffset = new Vec3();
+            bullet2CocosVec3(centerOfMassOffset, bt.RigidBody_getCenterOfMassOffset(this.body));
+            Vec3.transformQuat(centerOfMassOffset, centerOfMassOffset, this.node.worldRotation);
+            console.log(this.node.name, 'centerOfMassOffset', centerOfMassOffset.x, centerOfMassOffset.y, centerOfMassOffset.z);
+            const newCenterOfMassWorldPosition = new Vec3(0, 0, 0);
+            Vec3.add(newCenterOfMassWorldPosition, this.node.worldPosition, centerOfMassOffset);
+            //Vec3.subtract(newCenterOfMassWorldPosition, this.node.worldPosition, centerOfMassOffset);
+            cocos2BulletVec3(bt.Transform_getOrigin(bt_transform), newCenterOfMassWorldPosition);
+            console.log(this.node.name, 'newCenterOfMassWorldPosition', newCenterOfMassWorldPosition.x,
+                newCenterOfMassWorldPosition.y, newCenterOfMassWorldPosition.z);
 
             if (this.node.hasChangedFlags & TransformBit.SCALE) {
                 this.syncBodyScale();
@@ -421,13 +452,32 @@ export class BulletSharedBody {
 
     syncPhysicsToGraphics () {
         if (this.isBodySleeping()) return;
+
+        console.log(this.node.name, 'syncPhysicsToGraphics START');
+
         const bt_quat = BulletCache.instance.BT_QUAT_0;
-        const bt_transform = BulletCache.instance.BT_TRANSFORM_0;
-        bt.MotionState_getWorldTransform(bt.RigidBody_getMotionState(this.body), bt_transform);
+        //const bt_transform = BulletCache.instance.BT_TRANSFORM_0;
+        //bt.MotionState_getWorldTransform(bt.RigidBody_getMotionState(this.body), bt_transform);
+        const bt_transform = bt.RigidBody_getCenterOfMassTransform(this.body);
         bt.Transform_getRotation(bt_transform, bt_quat);
         this.node.worldRotation = bullet2CocosQuat(quat_0, bt_quat);
-        this.node.worldPosition = bullet2CocosVec3(v3_0, bt.Transform_getOrigin(bt_transform));
 
+        const centerOfMassWorldSpace = new Vec3();
+        bullet2CocosVec3(centerOfMassWorldSpace, bt.Transform_getOrigin(bt_transform));
+        console.log(this.node.name, 'centerOfMassWorldSpace', centerOfMassWorldSpace.x,
+            centerOfMassWorldSpace.y, centerOfMassWorldSpace.z);
+
+        const centerOfMassOffset = new Vec3();
+        bullet2CocosVec3(centerOfMassOffset, bt.RigidBody_getCenterOfMassOffset(this.body));
+        Vec3.transformQuat(centerOfMassOffset, centerOfMassOffset, this.node.worldRotation);
+        console.log(this.node.name, 'centerOfMassOffset', centerOfMassOffset.x,
+            centerOfMassOffset.y, centerOfMassOffset.z);
+
+        const temp = new Vec3();
+        Vec3.subtract(temp, centerOfMassWorldSpace, centerOfMassOffset);
+        //Vec3.add(temp, centerOfMassWorldSpace, centerOfMassOffset);
+        this.node.worldPosition = temp;
+        console.log(this.node.name, 'final node world pos', temp.x, temp.y, temp.z);
         // sync node to ghost
         if (this._ghostStruct) {
             const bt_transform1 = bt.CollisionObject_getWorldTransform(this.ghost);
@@ -435,6 +485,8 @@ export class BulletSharedBody {
             cocos2BulletQuat(bt_quat, this.node.worldRotation);
             bt.Transform_setRotation(bt_transform1, bt_quat);
         }
+
+        console.log(this.node.name, 'syncPhysicsToGraphics END');
     }
 
     syncSceneToGhost () {
