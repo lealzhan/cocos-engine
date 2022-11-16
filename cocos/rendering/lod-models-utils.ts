@@ -51,17 +51,17 @@ export class LODModelsCachedUtils {
         // eslint-disable-next-line no-lone-blocks
         for (const lodGroup of scene.lodGroups) {
             if (lodGroup.enabled) {
-                const LODLevels = lodGroup.getLockLODLevels();
+                const LODLevels = lodGroup.getLockedLODLevels();
                 const count = LODLevels.length;
                 //count == 0 will return to standard LOD processing.
                 if (count > 0) {
                     for (let index = 0; index < lodGroup.lodCount; index++) {
-                        const lod = lodGroup.LODs[index];
+                        const lod = lodGroup.lodDataArray[index];
                         for (const model of lod.models) {
                             for (let i = 0; i < count; i++) {
                                 // The LOD level to use.
                                 if (LODLevels[i] === index) {
-                                    if (model && model.node.active) {
+                                    if (model && model.node && model.node.active) {
                                         visibleModelsByAnyLODGroup.set(model, true);
                                         break;
                                     }
@@ -73,11 +73,11 @@ export class LODModelsCachedUtils {
                     continue;
                 }
 
-                const visIndex = lodGroup.getVisibleLOD(camera);
+                const visIndex = lodGroup.getVisibleLODLevel(camera);
                 for (let index = 0; index < lodGroup.lodCount; index++) {
-                    const lod = lodGroup.LODs[index];
+                    const lod = lodGroup.lodDataArray[index];
                     for (const model of lod.models) {
-                        if (visIndex === index && model && model.node.active) {
+                        if (visIndex === index && model && model.node && model.node.active) {
                             visibleModelsByAnyLODGroup.set(model, true);
                         }
                         modelsInAnyLODGroup.set(model, true);

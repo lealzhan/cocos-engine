@@ -28,7 +28,6 @@
 #include "core/Root.h"
 #include "core/TypedArray.h"
 #include "core/assets/Material.h"
-#include "core/event/EventTypesToJS.h"
 #include "gfx-base/GFXTexture.h"
 #include "gi/light-probe/LightProbe.h"
 #include "gi/light-probe/SH.h"
@@ -105,7 +104,7 @@ void Model::updateTransform(uint32_t stamp) {
     CC_PROFILE(ModelUpdateTransform);
     if (isModelImplementedInJS()) {
         if (!_isCalledFromJS) {
-            _eventProcessor.emit(EventTypesToJS::MODEL_UPDATE_TRANSFORM, stamp);
+            emit<UpdateTransform>(stamp);
             _isCalledFromJS = false;
             return;
         }
@@ -155,7 +154,7 @@ void Model::updateUBOs(uint32_t stamp) {
     CC_PROFILE(ModelUpdateUBOs);
     if (isModelImplementedInJS()) {
         if (!_isCalledFromJS) {
-            _eventProcessor.emit(EventTypesToJS::MODEL_UPDATE_UBO, stamp);
+            emit<UpdateUBO>(stamp);
             _isCalledFromJS = false;
             return;
         }
@@ -336,6 +335,38 @@ bool Model::isLightProbeAvailable() const {
     return true;
 }
 
+void Model::updateSHBuffer() {
+    if (_localSHData.empty()) {
+        return;
+    }
+
+    bool hasNonInstancingPass = false;
+    for (const auto &subModel : _subModels) {
+        const auto idx = subModel->getInstancedSHIndex();
+        if (idx >= 0) {
+            subModel->updateInstancedSH(_localSHData, idx);
+        } else {
+            hasNonInstancingPass = true;
+        }
+    }
+
+    if (hasNonInstancingPass && _localSHBuffer) {
+        _localSHBuffer->update(_localSHData.buffer()->getData());
+    }
+}
+
+void Model::clearSHUBOs() {
+    if (_localSHData.empty()) {
+        return;
+    }
+
+    for (auto i = 0; i < pipeline::UBOSH::COUNT; i++) {
+        _localSHData[i] = 0.0;
+    }
+
+    updateSHBuffer();
+}
+
 void Model::updateSHUBOs() {
     if (!isLightProbeAvailable()) {
         return;
@@ -343,7 +374,7 @@ void Model::updateSHUBOs() {
 
     const auto center = _worldBounds->getCenter();
 #if !CC_EDITOR
-    if (center == _lastWorldBoundCenter) {
+    if (center.approxEquals(_lastWorldBoundCenter, math::EPSILON)) {
         return;
     }
 #endif
@@ -360,18 +391,20 @@ void Model::updateSHUBOs() {
         return;
     }
 
-    if (!_localSHData.empty() && _localSHBuffer) {
-        gi::SH::reduceRinging(coefficients, lightProbes->getReduceRinging());
-        gi::SH::updateUBOData(_localSHData, pipeline::UBOSH::SH_LINEAR_CONST_R_OFFSET, coefficients);
-        _localSHBuffer->update(_localSHData.buffer()->getData());
+    if (_localSHData.empty()) {
+        return;
     }
+
+    gi::SH::reduceRinging(coefficients, lightProbes->getReduceRinging());
+    gi::SH::updateUBOData(_localSHData, pipeline::UBOSH::SH_LINEAR_CONST_R_OFFSET, coefficients);
+    updateSHBuffer();
 }
 
 ccstd::vector<IMacroPatch> Model::getMacroPatches(index_t subModelIndex) {
     if (isModelImplementedInJS()) {
         if (!_isCalledFromJS) {
             ccstd::vector<IMacroPatch> macroPatches;
-            _eventProcessor.emit(EventTypesToJS::MODEL_GET_MACRO_PATCHES, subModelIndex, &macroPatches);
+            emit<GetMacroPatches>(subModelIndex, &macroPatches);
             _isCalledFromJS = false;
             return macroPatches;
         }
@@ -414,7 +447,7 @@ void Model::updateAttributesAndBinding(index_t subModelIndex) {
 void Model::updateInstancedAttributes(const ccstd::vector<gfx::Attribute> &attributes, SubModel *subModel) {
     if (isModelImplementedInJS()) {
         if (!_isCalledFromJS) {
-            _eventProcessor.emit(EventTypesToJS::MODEL_UPDATE_INSTANCED_ATTRIBUTES, attributes, subModel);
+            emit<UpdateInstancedAttributes>(attributes, subModel); // FIXME
             _isCalledFromJS = false;
             return;
         }
@@ -467,7 +500,7 @@ void Model::initWorldBoundDescriptors(index_t /*subModelIndex*/) {
 void Model::updateLocalDescriptors(index_t subModelIndex, gfx::DescriptorSet *descriptorSet) {
     if (isModelImplementedInJS()) {
         if (!_isCalledFromJS) {
-            _eventProcessor.emit(EventTypesToJS::MODEL_UPDATE_LOCAL_DESCRIPTORS, subModelIndex, descriptorSet);
+            emit<UpdateLocalDescriptors>(subModelIndex, descriptorSet);
             _isCalledFromJS = false;
             return;
         }
@@ -481,7 +514,7 @@ void Model::updateLocalDescriptors(index_t subModelIndex, gfx::DescriptorSet *de
 void Model::updateLocalSHDescriptors(index_t subModelIndex, gfx::DescriptorSet *descriptorSet) {
     if (isModelImplementedInJS()) {
         if (!_isCalledFromJS) {
-            _eventProcessor.emit(EventTypesToJS::MODEL_UPDATE_LOCAL_SH_DESCRIPTORS, subModelIndex, descriptorSet);
+            emit<UpdateLocalSHDescriptor>(subModelIndex, descriptorSet);
             _isCalledFromJS = false;
             return;
         }
@@ -495,7 +528,7 @@ void Model::updateLocalSHDescriptors(index_t subModelIndex, gfx::DescriptorSet *
 void Model::updateWorldBoundDescriptors(index_t subModelIndex, gfx::DescriptorSet *descriptorSet) {
     if (isModelImplementedInJS()) {
         if (!_isCalledFromJS) {
-            _eventProcessor.emit(EventTypesToJS::MODEL_UPDATE_WORLD_BOUND_DESCRIPTORS, subModelIndex, descriptorSet);
+            emit<UpdateWorldBound>(subModelIndex, descriptorSet);
             _isCalledFromJS = false;
             return;
         }
@@ -508,6 +541,48 @@ void Model::updateWorldBoundDescriptors(index_t subModelIndex, gfx::DescriptorSe
 
 void Model::updateLocalShadowBias() {
     _localDataUpdated = true;
+}
+
+void Model::updateReflctionProbeCubemap(TextureCube *texture) {
+    _localDataUpdated = true;
+    if (texture == nullptr) {
+        texture = BuiltinResMgr::getInstance()->get<TextureCube>(ccstd::string("default-cube-texture"));
+    }
+    gfx::Texture *gfxTexture = texture->getGFXTexture();
+    if (gfxTexture) {
+        auto *sampler = _device->getSampler(texture->getSamplerInfo());
+        for (SubModel *subModel : _subModels) {
+            gfx::DescriptorSet *descriptorSet = subModel->getDescriptorSet();
+            descriptorSet->bindTexture(pipeline::REFLECTIONPROBECUBEMAP::BINDING, gfxTexture);
+            descriptorSet->bindSampler(pipeline::REFLECTIONPROBECUBEMAP::BINDING, sampler);
+            descriptorSet->update();
+        }
+    }
+}
+void Model::updateReflctionProbePlanarMap(gfx::Texture *texture) {
+    _localDataUpdated = true;
+
+    gfx::Texture *bindingTexture = texture;
+    if (!bindingTexture) {
+        bindingTexture = BuiltinResMgr::getInstance()->get<Texture2D>(ccstd::string("empty-texture"))->getGFXTexture();
+    }
+    if (bindingTexture) {
+        gfx::SamplerInfo info{
+            cc::gfx::Filter::LINEAR,
+            cc::gfx::Filter::LINEAR,
+            cc::gfx::Filter::NONE,
+            cc::gfx::Address::CLAMP,
+            cc::gfx::Address::CLAMP,
+            cc::gfx::Address::CLAMP,
+        };
+        auto *sampler = _device->getSampler(info);
+        for (SubModel *subModel : _subModels) {
+            gfx::DescriptorSet *descriptorSet = subModel->getDescriptorSet();
+            descriptorSet->bindTexture(pipeline::REFLECTIONPROBEPLANARMAP::BINDING, bindingTexture);
+            descriptorSet->bindSampler(pipeline::REFLECTIONPROBEPLANARMAP::BINDING, sampler);
+            descriptorSet->update();
+        }
+    }
 }
 
 void Model::setInstancedAttribute(const ccstd::string &name, const float *value, uint32_t byteLength) {

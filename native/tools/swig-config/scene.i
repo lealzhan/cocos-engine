@@ -15,6 +15,7 @@
 #include "core/scene-graph/Scene.h"
 #include "core/scene-graph/SceneGlobals.h"
 #include "scene/Light.h"
+#include "scene/LODGroup.h"
 #include "scene/Fog.h"
 #include "scene/Shadow.h"
 #include "scene/Skybox.h"
@@ -37,6 +38,7 @@
 #include "3d/models/BakedSkinningModel.h"
 #include "renderer/core/ProgramLib.h"
 #include "scene/Octree.h"
+#include "scene/ReflectionProbe.h"
 %}
 
 // Insert code at the beginning of generated source file (.cpp)
@@ -66,8 +68,14 @@ using namespace cc;
 //  1. 'Ignore Section' should be placed before attribute definition and %import/%include
 //  2. namespace is needed
 //
+%ignore cc::scene::LODGroup::getVisibleLODLevel;
+%ignore cc::scene::LODGroup::getLockedLODLevels;
+
 %ignore cc::scene::Pass::getBlocks;
 %ignore cc::scene::Pass::initPassFromTarget;
+
+%ignore cc::Root::getEventProcessor;
+%ignore cc::Node::getEventProcessor;
 
 %ignore cc::Node::setRTSInternal;
 %ignore cc::Node::setRTS;
@@ -76,10 +84,13 @@ using namespace cc;
 %ignore cc::scene::SubModel::getInstancedAttributeBlock;
 %ignore cc::scene::SubModel::getInstancedWorldMatrixIndex;
 %ignore cc::scene::SubModel::setInstancedWorldMatrixIndex;
+%ignore cc::scene::SubModel::getInstancedSHIndex;
+%ignore cc::scene::SubModel::setInstancedSHIndex;
 %ignore cc::scene::SubModel::getInstancedAttributeIndex;
 %ignore cc::scene::SubModel::setInstancedAttributeIndex;
 %ignore cc::scene::SubModel::updateInstancedAttributes;
 %ignore cc::scene::SubModel::updateInstancedWorldMatrix;
+%ignore cc::scene::SubModel::updateInstancedSH;
 
 %ignore cc::scene::Model::getLocalData;
 %ignore cc::scene::Model::getEventProcessor;
@@ -94,6 +105,8 @@ using namespace cc;
 %ignore cc::scene::RenderScene::removeBatch;
 %ignore cc::scene::RenderScene::removeBatches;
 %ignore cc::scene::RenderScene::getBatches;
+%ignore cc::scene::RenderScene::getLODGroups;
+%ignore cc::scene::RenderScene::removeLODGroups;
 
 %ignore cc::scene::BakedSkinningModel::updateInstancedJointTextureInfo;
 %ignore cc::scene::BakedSkinningModel::updateModelBounds;
@@ -181,6 +194,7 @@ using namespace cc;
 %rename(_updateLocalDescriptors) cc::scene::Model::updateLocalDescriptors;
 %rename(_initLocalSHDescriptors) cc::scene::Model::initLocalSHDescriptors;
 %rename(_updateLocalSHDescriptors) cc::scene::Model::updateLocalSHDescriptors;
+%rename(_updateInstancedAttributes) cc::scene::Model::updateInstancedAttributes;
 
 %rename(_load) cc::Scene::load;
 %rename(_activate) cc::Scene::activate;
@@ -288,6 +302,17 @@ using namespace cc;
 %attribute(cc::scene::Light, cc::scene::RenderScene*, scene, getScene);
 %attribute(cc::scene::Light, uint32_t, visibility, getVisibility, setVisibility);
 
+%attribute(cc::scene::LODData, float, screenUsagePercentage, getScreenUsagePercentage, setScreenUsagePercentage);
+%attribute(cc::scene::LODData, ccstd::vector<cc::IntrusivePtr<cc::scene::Model>>&, models, getModels);
+%attribute(cc::scene::LODGroup, uint8_t, lodCount, getLodCount);
+%attribute(cc::scene::LODGroup, bool, enabled, isEnabled, setEnabled);
+%attribute(cc::scene::LODGroup, cc::Vec3&, localBoundaryCenter, getLocalBoundaryCenter, setLocalBoundaryCenter);
+%attribute(cc::scene::LODGroup, float, objectSize, getObjectSize, setObjectSize);
+%attribute(cc::scene::LODGroup, cc::Node*, node, getNode, setNode);
+%attribute(cc::scene::LODGroup, ccstd::vector<cc::IntrusivePtr<cc::scene::LODData>>&, lodDataArray, getLodDataArray);
+%attribute(cc::scene::LODGroup, cc::scene::RenderScene*, scene, getScene);
+
+
 %attribute(cc::scene::DirectionalLight, cc::Vec3&, direction, getDirection, setDirection);
 %attribute(cc::scene::DirectionalLight, float, illuminance, getIlluminance, setIlluminance);
 %attribute(cc::scene::DirectionalLight, float, illuminanceHDR, getIlluminanceHDR, setIlluminanceHDR);
@@ -377,6 +402,8 @@ using namespace cc;
 %attribute(cc::scene::RenderScene, ccstd::vector<cc::IntrusivePtr<cc::scene::SphereLight>>&, sphereLights, getSphereLights);
 %attribute(cc::scene::RenderScene, ccstd::vector<cc::IntrusivePtr<cc::scene::SpotLight>>&, spotLights, getSpotLights);
 %attribute(cc::scene::RenderScene, ccstd::vector<cc::IntrusivePtr<cc::scene::Model>>&, models, getModels);
+%attribute(cc::scene::RenderScene, ccstd::vector<cc::IntrusivePtr<cc::scene::LODGroup>>&, lodGroups, getLODGroups);
+
 
 %attribute(cc::scene::Skybox, cc::scene::Model*, model, getModel);
 %attribute(cc::scene::Skybox, bool, enabled, isEnabled, setEnabled);
@@ -423,6 +450,8 @@ using namespace cc;
 %attribute(cc::scene::Model, bool, isDynamicBatching, isDynamicBatching, setDynamicBatching);
 %attribute(cc::scene::Model, uint32_t, priority, getPriority, setPriority);
 %attribute(cc::scene::Model, bool, useLightProbe, getUseLightProbe, setUseLightProbe);
+%attribute(cc::scene::Model, bool, bakeToReflectionProbe, getBakeToReflectionProbe, setBakeToReflectionProbe);
+%attribute(cc::scene::Model, uint32_t, reflectionProbeType, getReflectionProbeType, setReflectionProbeType);
 
 %attribute(cc::scene::SubModel, std::shared_ptr<ccstd::vector<cc::IntrusivePtr<cc::scene::Pass>>> &, passes, getPasses, setPasses);
 %attribute(cc::scene::SubModel, ccstd::vector<cc::IntrusivePtr<cc::gfx::Shader>> &, shaders, getShaders, setShaders);
@@ -493,6 +522,15 @@ using namespace cc;
 
 %attribute(cc::Scene, bool, autoReleaseAssets, isAutoReleaseAssets, setAutoReleaseAssets);
 
+%attribute(cc::scene::ReflectionProbe, cc::scene::ReflectionProbe::ProbeType, probeType, getProbeType, setProbeType);
+%attribute(cc::scene::ReflectionProbe, uint32_t, resolution, getResolution, setResolution);
+%attribute(cc::scene::ReflectionProbe, cc::gfx::ClearFlagBit, clearFlag, getClearFlag, setClearFlag);
+%attribute(cc::scene::ReflectionProbe, cc::gfx::Color&, backgroundColor, getBackgroundColor, setBackgroundColor);
+%attribute(cc::scene::ReflectionProbe, uint32_t, visibility, getVisibility, setVisibility);
+%attribute(cc::scene::ReflectionProbe, Vec3&, size, getBoudingSize, setBoudingSize);
+
+
+
 // ----- Import Section ------
 // Brief: Import header files which are depended by 'Include Section'
 // Note:
@@ -515,6 +553,8 @@ using namespace cc;
 %import "math/Mat3.h"
 %import "math/Mat4.h"
 %import "math/Quaternion.h"
+
+%import "core/event/Event.h"
 
 // %import "renderer/gfx-base/GFXDef-common.h"
 %import "core/data/Object.h"
@@ -565,6 +605,7 @@ using namespace cc;
 
 %include "scene/Define.h"
 %include "scene/Light.h"
+%include "scene/LODGroup.h"
 %include "scene/Fog.h"
 %include "scene/Shadow.h"
 %include "scene/Skybox.h"
@@ -578,6 +619,7 @@ using namespace cc;
 %include "scene/RenderWindow.h"
 %include "scene/Camera.h"
 %include "scene/Ambient.h"
+%include "scene/ReflectionProbe.h"
 %include "renderer/core/PassInstance.h"
 %include "renderer/core/MaterialInstance.h"
 

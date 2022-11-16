@@ -44,6 +44,7 @@
 #include "core/scene-graph/Scene.h"
 #include "core/scene-graph/SceneGlobals.h"
 #include "scene/Light.h"
+#include "scene/LODGroup.h"
 #include "scene/Fog.h"
 #include "scene/Shadow.h"
 #include "scene/Skybox.h"
@@ -66,6 +67,7 @@
 #include "3d/models/BakedSkinningModel.h"
 #include "renderer/core/ProgramLib.h"
 #include "scene/Octree.h"
+#include "scene/ReflectionProbe.h"
 
 
 
@@ -123,6 +125,16 @@ bool sevalue_to_native(const se::Value &from, cc::scene::IMacroPatch * to, se::O
 JSB_REGISTER_OBJECT_TYPE(cc::scene::Light);
 extern se::Object *__jsb_cc_scene_Light_proto; // NOLINT
 extern se::Class * __jsb_cc_scene_Light_class; // NOLINT
+
+
+JSB_REGISTER_OBJECT_TYPE(cc::scene::LODData);
+extern se::Object *__jsb_cc_scene_LODData_proto; // NOLINT
+extern se::Class * __jsb_cc_scene_LODData_class; // NOLINT
+
+
+JSB_REGISTER_OBJECT_TYPE(cc::scene::LODGroup);
+extern se::Object *__jsb_cc_scene_LODGroup_proto; // NOLINT
+extern se::Class * __jsb_cc_scene_LODGroup_class; // NOLINT
 
 
 JSB_REGISTER_OBJECT_TYPE(cc::scene::Fog);
@@ -271,6 +283,11 @@ extern se::Class * __jsb_cc_scene_Ambient_class; // NOLINT
 JSB_REGISTER_OBJECT_TYPE(cc::scene::AmbientInfo);
 extern se::Object *__jsb_cc_scene_AmbientInfo_proto; // NOLINT
 extern se::Class * __jsb_cc_scene_AmbientInfo_class; // NOLINT
+
+
+JSB_REGISTER_OBJECT_TYPE(cc::scene::ReflectionProbe);
+extern se::Object *__jsb_cc_scene_ReflectionProbe_proto; // NOLINT
+extern se::Class * __jsb_cc_scene_ReflectionProbe_class; // NOLINT
 
 
 JSB_REGISTER_OBJECT_TYPE(cc::PassInstance);
