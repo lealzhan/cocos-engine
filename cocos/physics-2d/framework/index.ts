@@ -1,8 +1,4 @@
-import { legacyCC } from '../../core/global-exports';
-
 import * as PolygonSeparator from './utils/polygon-separator';
-
-import { selector } from './physics-selector';
 
 export * from './physics-types';
 
@@ -32,8 +28,4 @@ export * from './components/joints/hinge-joint-2d';
 
 export const Physics2DUtils = {
     PolygonSeparator,
-};
-
-legacyCC.internal.physics2d = {
-    selector,
 };

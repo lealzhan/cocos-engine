@@ -1,8 +1,8 @@
 import { EDITOR } from 'internal:constants';
 import { System, Vec2, IVec2Like, Rect, Eventify, Enum } from '../../core';
 import { IPhysicsWorld } from '../spec/i-physics-world';
-import { createPhysicsWorld, selector, IPhysicsSelector } from './physics-selector';
-
+import { createPhysicsWorld } from './instance';
+import { physicsEngineId } from './physics-selector';
 import { DelayEvent } from './physics-internal-types';
 import { ICollisionMatrix } from '../../physics/framework/physics-config';
 import { CollisionMatrix } from '../../physics/framework/collision-matrix';
@@ -131,9 +131,7 @@ export class PhysicsSystem2D extends Eventify(System) {
      * @zh
      * 获取物理世界的封装对象，通过它你可以访问到实际的底层对象。
      */
-    public get physicsWorld () {
-        return selector.physicsWorld!;
-    }
+    readonly physicsWorld: IPhysicsWorld;
 
     /**
      * @en
@@ -144,15 +142,15 @@ export class PhysicsSystem2D extends Eventify(System) {
     static readonly ID = 'PHYSICS_2D';
 
     static get PHYSICS_NONE () {
-        return !selector.id;
+        return !physicsEngineId;
     }
 
     static get PHYSICS_BUILTIN () {
-        return selector.id === 'builtin';
+        return physicsEngineId === 'builtin';
     }
 
     static get PHYSICS_BOX2D () {
-        return selector.id === 'box2d';
+        return physicsEngineId === 'box2d';
     }
 
     /**
@@ -231,9 +229,7 @@ export class PhysicsSystem2D extends Eventify(System) {
             }
         }
 
-        const mutableSelector = selector as Mutable<IPhysicsSelector>;
-        mutableSelector.physicsWorld = createPhysicsWorld();
-
+        this.physicsWorld = createPhysicsWorld();
         this.gravity = this._gravity;
         this.allowSleep = this._allowSleep;
     }
@@ -285,7 +281,6 @@ export class PhysicsSystem2D extends Eventify(System) {
         director.emit(Director.EVENT_AFTER_PHYSICS);
     }
 
-    // eslint-disable-next-line @typescript-eslint/ban-types
     _callAfterStep (target: object, func: Function) {
         if (this._steping) {
             this._delayEvents.push({
@@ -352,8 +347,12 @@ export class PhysicsSystem2D extends Eventify(System) {
     }
 }
 
-function initPhysicsSystem () {
-    director.registerSystem(PhysicsSystem2D.ID, PhysicsSystem2D.instance, System.Priority.LOW);
-}
+director.once(Director.EVENT_INIT, () => {
+    initPhysicsSystem();
+});
 
-director.once(Director.EVENT_INIT, () => { initPhysicsSystem(); });
+function initPhysicsSystem () {
+    if (!PhysicsSystem2D.PHYSICS_NONE && (!EDITOR || legacyCC.GAME_VIEW)) {
+        director.registerSystem(PhysicsSystem2D.ID, PhysicsSystem2D.instance, System.Priority.LOW);
+    }
+}
