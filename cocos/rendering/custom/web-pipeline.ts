@@ -1,18 +1,17 @@
 /****************************************************************************
- Copyright (c) 2021-2022 Xiamen Yaji Software Co., Ltd.
+ Copyright (c) 2021-2023 Xiamen Yaji Software Co., Ltd.
 
  http://www.cocos.com
 
  Permission is hereby granted, free of charge, to any person obtaining a copy
- of this software and associated engine source code (the "Software"), a limited,
- worldwide, royalty-free, non-assignable, revocable and non-exclusive license
- to use Cocos Creator solely to develop games on your target platforms. You shall
- not use Cocos Creator software for developing other software or tools that's
- used for developing games. You are not granted to publish, distribute,
- sublicense, and/or sell copies of Cocos Creator.
+ of this software and associated documentation files (the "Software"), to deal
+ in the Software without restriction, including without limitation the rights to
+ use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+ of the Software, and to permit persons to whom the Software is furnished to do so,
+ subject to the following conditions:
 
- The software or tools in this License Agreement are licensed, not sold.
- Xiamen Yaji Software Co., Ltd. reserves all rights not expressly granted to you.
+ The above copyright notice and this permission notice shall be included in
+ all copies or substantial portions of the Software.
 
  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -33,7 +32,7 @@ import { ComputePassBuilder, ComputeQueueBuilder, CopyPassBuilder, LayoutGraphBu
 import { PipelineSceneData } from '../pipeline-scene-data';
 import { Model, Camera, ShadowType, CSMLevel, DirectionalLight, SpotLight, PCFType, Shadows } from '../../render-scene/scene';
 import { Light, LightType } from '../../render-scene/scene/light';
-import { LayoutGraphData } from './layout-graph';
+import { DescriptorSetData, DescriptorSetLayoutData, LayoutGraphData } from './layout-graph';
 import { Executor } from './executor';
 import { RenderWindow } from '../../render-scene/core/render-window';
 import { MacroRecord, RenderScene } from '../../render-scene';
@@ -52,6 +51,7 @@ import { CustomPipelineBuilder } from './custom-pipeline';
 import { decideProfilerCamera } from '../pipeline-funcs';
 import { DebugViewCompositeType } from '../debug-view';
 import { getUBOTypeCount } from './utils';
+import { initGlobalDescBinding } from './define';
 
 export class WebSetter {
     constructor (data: RenderData, lg: LayoutGraphData) {
@@ -438,7 +438,7 @@ function setCameraUBOValues (setter: WebSetter,
 
     const fog = cfg.fog;
     const colorTempRGB = fog.colorArray;
-    setter.setVec4('cc_fogColor', new Vec4(colorTempRGB.x, colorTempRGB.y, colorTempRGB.z, colorTempRGB.w));
+    setter.setVec4('cc_fogColor', new Vec4(colorTempRGB.x, colorTempRGB.y, colorTempRGB.z, colorTempRGB.z));
     setter.setVec4('cc_fogBase', new Vec4(fog.fogStart, fog.fogEnd, fog.fogDensity, 0.0));
     setter.setVec4('cc_fogAdd', new Vec4(fog.fogTop, fog.fogRange, fog.fogAtten, 0.0));
     setter.setVec4('cc_nearFar', new Vec4(camera.nearClip, camera.farClip, 0.0, 0.0));
@@ -524,6 +524,7 @@ export class WebRasterQueueBuilder extends WebSetter implements RasterQueueBuild
             setShadowUBOView(this, camera);
         }
         setTextureUBOView(this, camera, this._pipeline);
+        initGlobalDescBinding(cclegacy.director.root.pipeline, this._data);
     }
     addScene (sceneName: string, sceneFlags = SceneFlags.NONE): void {
         const sceneData = new SceneData(sceneName, sceneFlags);
@@ -550,6 +551,7 @@ export class WebRasterQueueBuilder extends WebSetter implements RasterQueueBuild
             setShadowUBOView(this, camera);
         }
         setTextureUBOView(this, camera, this._pipeline);
+        initGlobalDescBinding(cclegacy.director.root.pipeline, this._data);
     }
     clearRenderTarget (name: string, color: Color = new Color()) {
         this._renderGraph.addVertex<RenderGraphValue.Clear>(
@@ -582,6 +584,10 @@ export class WebRasterPassBuilder extends WebSetter implements RasterPassBuilder
             RenderGraphComponent.Layout, this._vertID,
         );
         this._layoutID = layoutGraph.locateChild(layoutGraph.nullVertex(), layoutName);
+    }
+    setVersion (name: string, version: number): void {
+        this._pass.versionName = name;
+        this._pass.version = version;
     }
     get name () {
         return this._renderGraph.getName(this._vertID);
@@ -775,12 +781,29 @@ function isManaged (residency: ResourceResidency): boolean {
 }
 
 export class WebPipeline implements Pipeline {
+    constructor (layoutGraph: LayoutGraphData) {
+        this._layoutGraph = layoutGraph;
+    }
     updateRenderWindow (name: string, renderWindow: RenderWindow): void {
         const resId = this.resourceGraph.vertex(name);
         const currFbo = this.resourceGraph._vertices[resId]._object;
         if (currFbo !== renderWindow.framebuffer) {
             this.resourceGraph._vertices[resId]._object = renderWindow.framebuffer;
         }
+    }
+    updateRenderTarget (name: string, width: number, height: number, format: Format = Format.UNKNOWN): void {
+        const resId = this.resourceGraph.vertex(name);
+        const desc = this.resourceGraph.getDesc(resId);
+        desc.width = width;
+        desc.height = height;
+        if (format !== Format.UNKNOWN) desc.format = format;
+    }
+    updateDepthStencil (name: string, width: number, height: number, format: Format = Format.UNKNOWN): void {
+        const resId = this.resourceGraph.vertex(name);
+        const desc = this.resourceGraph.getDesc(resId);
+        desc.width = width;
+        desc.height = height;
+        if (format !== Format.UNKNOWN) desc.format = format;
     }
     public containsResource (name: string): boolean {
         return this._resourceGraph.contains(name);
@@ -813,6 +836,7 @@ export class WebPipeline implements Pipeline {
         const jointUniformCapacity = UBOSkinning.JOINT_UNIFORM_CAPACITY;
         str += `#define CC_JOINT_UNIFORM_CAPACITY ${jointUniformCapacity}\n`;
         this._constantMacros = str;
+        this._layoutGraph.constantMacros = this._constantMacros;
     }
     public setCustomPipelineName (name: string) {
         this._customPipelineName = name;
@@ -838,12 +862,18 @@ export class WebPipeline implements Pipeline {
         return this._combineSignY;
     }
 
+    get globalDescriptorSetData () {
+        return this._globalDescSetData;
+    }
+
     public activate (swapchain: Swapchain): boolean {
         this._device = deviceManager.gfxDevice;
+        this.layoutGraphBuilder.compile();
         this._globalDSManager = new GlobalDSManager(this._device);
-        const globalLayoutData = this.getGlobalDescriptorSetData()!;
-        this._globalDescriptorSetLayout = globalLayoutData.descriptorSetLayout;
-        this._globalDescriptorSet = globalLayoutData.descriptorSet!;
+        this._globalDescSetData = this.getGlobalDescriptorSetData()!;
+        this._globalDescriptorSetLayout = this._globalDescSetData.descriptorSetLayout;
+        this._globalDescriptorSet = this._globalDescSetData.descriptorSet!;
+        this._globalDSManager.globalDescriptorSet = this.globalDescriptorSet;
         this.setMacroBool('CC_USE_HDR', this._pipelineSceneData.isHDR);
         this._generateConstantMacros(false);
         this._pipelineSceneData.activate(this._device);
@@ -860,11 +890,22 @@ export class WebPipeline implements Pipeline {
             >= (WebPipeline.CSM_UNIFORM_VECTORS + WebPipeline.GLOBAL_UNIFORM_VECTORS);
         this.setMacroBool('CC_SUPPORT_CASCADED_SHADOW_MAP', this.pipelineSceneData.csmSupported);
 
+        // 0: CC_SHADOW_NONE, 1: CC_SHADOW_PLANAR, 2: CC_SHADOW_MAP
+        this.setMacroInt('CC_SHADOW_TYPE', 0);
+
+        // 0: PCFType.HARD, 1: PCFType.SOFT, 2: PCFType.SOFT_2X, 3: PCFType.SOFT_4X
+        this.setMacroInt('CC_DIR_SHADOW_PCF_TYPE', PCFType.HARD);
+
+        // 0: CC_DIR_LIGHT_SHADOW_NONE, 1: CC_DIR_LIGHT_SHADOW_UNIFORM, 2: CC_DIR_LIGHT_SHADOW_CASCADED, 3: CC_DIR_LIGHT_SHADOW_VARIANCE
+        this.setMacroInt('CC_DIR_LIGHT_SHADOW_TYPE', 0);
+
+        // 0: CC_CASCADED_LAYERS_TRANSITION_OFF, 1: CC_CASCADED_LAYERS_TRANSITION_ON
+        this.setMacroBool('CC_CASCADED_LAYERS_TRANSITION',  false);
+
         // enable the deferred pipeline
         if (this.usesDeferredPipeline) {
             this.setMacroInt('CC_PIPELINE_TYPE', 1);
         }
-        this.layoutGraphBuilder.compile();
 
         this._forward = new ForwardPipelineBuilder();
         this._deferred = new DeferredPipelineBuilder();
@@ -1013,7 +1054,6 @@ export class WebPipeline implements Pipeline {
         desc.format = format;
         desc.flags = ResourceFlags.COLOR_ATTACHMENT | ResourceFlags.SAMPLED;
 
-        assert(isManaged(residency));
         return this._resourceGraph.addVertex<ResourceGraphValue.Managed>(
             ResourceGraphValue.Managed,
             new ManagedResource(),
@@ -1113,6 +1153,7 @@ export class WebPipeline implements Pipeline {
         );
         const result = new WebRasterPassBuilder(data, this._renderGraph!, this._layoutGraph, vertID, pass, this._pipelineSceneData);
         this._updateRasterPassConstants(result, width, height);
+        initGlobalDescBinding(cclegacy.director.root.pipeline, data);
         return result;
     }
     public getDescriptorSetLayout (shaderName: string, freq: UpdateFrequency): DescriptorSetLayout {
@@ -1131,6 +1172,7 @@ export class WebPipeline implements Pipeline {
     get layoutGraph () {
         return this._layoutGraph;
     }
+
     protected _updateRasterPassConstants (setter: WebSetter, width: number, height: number) {
         const director = cclegacy.director;
         const root = director.root;
@@ -1188,7 +1230,7 @@ export class WebPipeline implements Pipeline {
     private _pipelineUBO: PipelineUBO = new PipelineUBO();
     private _cameras: Camera[] = [];
 
-    private _layoutGraph: LayoutGraphData = new LayoutGraphData();
+    private _layoutGraph: LayoutGraphData;
     private readonly _resourceGraph: ResourceGraph = new ResourceGraph();
     private _renderGraph: RenderGraph | null = null;
     private _compiler: Compiler | null = null;
@@ -1196,6 +1238,7 @@ export class WebPipeline implements Pipeline {
     private _customPipelineName = '';
     private _forward!: ForwardPipelineBuilder;
     private _deferred!: DeferredPipelineBuilder;
+    private _globalDescSetData!: DescriptorSetData;
     public builder: PipelineBuilder | null = null;
     private _combineSignY = 0;
     // csm uniform used vectors count

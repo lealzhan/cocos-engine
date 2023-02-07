@@ -1,18 +1,17 @@
 /****************************************************************************
- Copyright (c) 2022 Xiamen Yaji Software Co., Ltd.
+ Copyright (c) 2022-2023 Xiamen Yaji Software Co., Ltd.
 
  http://www.cocos.com
 
  Permission is hereby granted, free of charge, to any person obtaining a copy
- of this software and associated engine source code (the "Software"), a limited,
- worldwide, royalty-free, non-assignable, revocable and non-exclusive license
- to use Cocos Creator solely to develop games on your target platforms. You shall
- not use Cocos Creator software for developing other software or tools that's
- used for developing games. You are not granted to publish, distribute,
- sublicense, and/or sell copies of Cocos Creator.
+ of this software and associated documentation files (the "Software"), to deal
+ in the Software without restriction, including without limitation the rights to
+ use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+ of the Software, and to permit persons to whom the Software is furnished to do so,
+ subject to the following conditions:
 
- The software or tools in this License Agreement are licensed, not sold.
- Xiamen Yaji Software Co., Ltd. reserves all rights not expressly granted to you.
+ The above copyright notice and this permission notice shall be included in
+ all copies or substantial portions of the Software.
 
  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -68,16 +67,16 @@ struct FunctionExactor<R(ARGS...)> {
         };
         return func;
     }
-    static R call(const se::Value &fnVal, ARGS &&...args) {
+    static R call(se::Object *jsThisObject, const se::Value &fnVal, ARGS &&...args) {
         se::AutoHandleScope scope;
         se::ValueArray jsArgs;
         jsArgs.resize(sizeof...(ARGS));
         nativevalue_to_se_args_v(jsArgs, std::forward<ARGS>(args)...);
         se::Value rval;
-        bool succ = fnVal.toObject()->call(jsArgs, nullptr, &rval);
+        bool succ = fnVal.toObject()->call(jsArgs, jsThisObject, &rval);
         if constexpr (!std::is_void_v<R>) {
             R result;
-            sevalue_to_native(rval, &result, nullptr);
+            sevalue_to_native(rval, &result, jsThisObject);
             return result;
         }
     }
@@ -1045,13 +1044,17 @@ auto bindFunction(const se::Value &fnVal) {
 }
 
 template <typename R, typename... ARGS>
-R callFunction(const se::Value &fnVal, ARGS... args) {
+R callFunction(se::Object *jsThisObject, const se::Value &fnVal, ARGS... args) {
     using T = R(ARGS...);
     assert(fnVal.isObject() && fnVal.toObject()->isFunction());
     if constexpr (!std::is_void_v<R>) {
-        return intl::FunctionExactor<T>::call(fnVal, std::forward<ARGS>(args)...);
+        return intl::FunctionExactor<T>::call(jsThisObject, fnVal, std::forward<ARGS>(args)...);
     } else {
-        intl::FunctionExactor<T>::call(fnVal, std::forward<ARGS>(args)...);
+        intl::FunctionExactor<T>::call(jsThisObject, fnVal, std::forward<ARGS>(args)...);
     }
+}
+template <typename R, typename... ARGS>
+R callFunction(const se::Value &fnVal, ARGS... args) {
+    return callFunction<R, ARGS...>(nullptr, fnVal, args...);
 }
 } // namespace sebind

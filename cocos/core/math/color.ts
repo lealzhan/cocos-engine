@@ -1,19 +1,18 @@
 /*
  Copyright (c) 2013-2016 Chukong Technologies Inc.
- Copyright (c) 2017-2020 Xiamen Yaji Software Co., Ltd.
+ Copyright (c) 2017-2023 Xiamen Yaji Software Co., Ltd.
 
  http://www.cocos.com
 
  Permission is hereby granted, free of charge, to any person obtaining a copy
- of this software and associated engine source code (the "Software"), a limited,
-  worldwide, royalty-free, non-assignable, revocable and non-exclusive license
- to use Cocos Creator solely to develop games on your target platforms. You shall
-  not use Cocos Creator software for developing other software or tools that's
-  used for developing games. You are not granted to publish, distribute,
-  sublicense, and/or sell copies of Cocos Creator.
+ of this software and associated documentation files (the "Software"), to deal
+ in the Software without restriction, including without limitation the rights to
+ use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+ of the Software, and to permit persons to whom the Software is furnished to do so,
+ subject to the following conditions:
 
- The software or tools in this License Agreement are licensed, not sold.
- Xiamen Yaji Software Co., Ltd. reserves all rights not expressly granted to you.
+ The above copyright notice and this permission notice shall be included in
+ all copies or substantial portions of the Software.
 
  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -31,6 +30,7 @@ import { clamp, EPSILON } from './utils';
 import { legacyCC } from '../global-exports';
 import { assertIsTrue } from '../data/utils/asserts';
 import { Vec4 } from './vec4';
+import { Vec3 } from './vec3';
 
 const toFloat = 1 / 255;
 
@@ -752,3 +752,49 @@ export function linearToSrgb8Bit (x: number): number {
 // use table for more consistent conversion between uint8 and float, offline processes only.
 let SRGB_8BIT_TO_LINEAR: Array<number> = [];
 for (let i = 0; i < 256; i++) { SRGB_8BIT_TO_LINEAR.push(srgbToLinear(i / 255.0)); }
+
+export function clampVec3 (val: Vec3, min: Vec3, max: Vec3) {
+    if (min > max) {
+        const temp = min;
+        min = max;
+        max = temp;
+    }
+    return val < min ? min : val > max ? max : val;
+}
+
+export function floorVec3 (val: Vec3) {
+    const temp = val.clone();
+    temp.x = Math.floor(val.x);
+    temp.y = Math.floor(val.y);
+    temp.z = Math.floor(val.z);
+    return temp;
+}
+
+export function stepVec3 (a: Vec3, b: Vec3) {
+    if (a < b) {
+        return b;
+    } else {
+        return a;
+    }
+}
+
+/**
+ * @en Three channel rgb color pack into four channel rbge format.
+ * @zh 三通道rgb颜色pack成四通道rbge格式
+ * @param rgb Vec3
+ */
+export function packRGBE (rgb: Vec3) {
+    const maxComp = Math.max(Math.max(rgb.x, rgb.y), rgb.z);
+    let e = 128.0;
+    if (maxComp > 0.0001) {
+        e = Math.log(maxComp) / Math.log(1.1);
+        e = Math.ceil(e);
+        e = clamp(e + 128.0, 0.0, 255.0);
+    }
+    // eslint-disable-next-line no-restricted-properties
+    const sc = 1.0 / Math.pow(1.1, e - 128.0);
+    const encode = clampVec3(rgb.multiplyScalar(sc), new Vec3(0.0, 0.0, 0.0), new Vec3(1.0, 1.0, 1.0));
+    encode.multiplyScalar(255.0);
+    const encode_rounded = floorVec3(encode).add(stepVec3(encode.subtract(floorVec3(encode)), new Vec3(0.5, 0.5, 0.5)));
+    return new Vec4(encode_rounded.x / 255.0, encode_rounded.y / 255.0, encode_rounded.z / 255.0, e / 255.0);
+}

@@ -1,19 +1,18 @@
 /****************************************************************************
  Copyright (c) 2016 Chukong Technologies Inc.
- Copyright (c) 2017-2022 Xiamen Yaji Software Co., Ltd.
+ Copyright (c) 2017-2023 Xiamen Yaji Software Co., Ltd.
 
  http://www.cocos.com
 
  Permission is hereby granted, free of charge, to any person obtaining a copy
- of this software and associated engine source code (the "Software"), a limited,
- worldwide, royalty-free, non-assignable, revocable and non-exclusive license
- to use Cocos Creator solely to develop games on your target platforms. You shall
- not use Cocos Creator software for developing other software or tools that's
- used for developing games. You are not granted to publish, distribute,
- sublicense, and/or sell copies of Cocos Creator.
+ of this software and associated documentation files (the "Software"), to deal
+ in the Software without restriction, including without limitation the rights to
+ use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+ of the Software, and to permit persons to whom the Software is furnished to do so,
+ subject to the following conditions:
 
- The software or tools in this License Agreement are licensed, not sold.
- Xiamen Yaji Software Co., Ltd. reserves all rights not expressly granted to you.
+ The above copyright notice and this permission notice shall be included in
+ all copies or substantial portions of the Software.
 
  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -26,6 +25,11 @@
 
 #include "Object.h"
 #include "v8/HelperMacros.h"
+
+// Use node::Buffer to replace v8 api,to avoid link err in editor platform.
+#if CC_EDITOR && CC_PLATFORM == CC_PLATFORM_WINDOWS
+    #include <node_buffer.h>
+#endif
 
 #if SCRIPT_ENGINE_TYPE == SCRIPT_ENGINE_V8
     #include "../MappingUtils.h"
@@ -217,11 +221,18 @@ Object *Object::createArrayObject(size_t length) {
 }
 
 Object *Object::createArrayBufferObject(const void *data, size_t byteLength) {
+    #if CC_EDITOR && CC_PLATFORM == CC_PLATFORM_WINDOWS
+    auto nodeBuffer = node::Buffer::New(__isolate, byteLength);
+    auto *srcData = node::Buffer::Data(nodeBuffer.ToLocalChecked());
+    v8::Local<v8::ArrayBuffer> jsobj = nodeBuffer.ToLocalChecked().As<v8::TypedArray>()->Buffer();
+    #else
     v8::Local<v8::ArrayBuffer> jsobj = v8::ArrayBuffer::New(__isolate, byteLength);
+    auto *srcData = jsobj->GetBackingStore()->Data();
+    #endif
     if (data) {
-        memcpy(jsobj->GetBackingStore()->Data(), data, byteLength);
+        memcpy(srcData, data, byteLength);
     } else {
-        memset(jsobj->GetBackingStore()->Data(), 0, byteLength);
+        memset(srcData, 0, byteLength);
     }
     Object *obj = Object::_createJSObject(nullptr, jsobj);
     return obj;
@@ -229,9 +240,18 @@ Object *Object::createArrayBufferObject(const void *data, size_t byteLength) {
 
 /* static */
 Object *Object::createExternalArrayBufferObject(void *contents, size_t byteLength, BufferContentsFreeFunc freeFunc, void *freeUserData /* = nullptr*/) {
-    std::shared_ptr<v8::BackingStore> backingStore = v8::ArrayBuffer::NewBackingStore(contents, byteLength, freeFunc, freeUserData);
     Object *obj = nullptr;
+    #if CC_EDITOR && CC_PLATFORM == CC_PLATFORM_WINDOWS
+    auto nodeBuffer = node::Buffer::New(
+                          __isolate, (char *)contents, byteLength, [](char *data, void *hint) {}, nullptr)
+                          .ToLocalChecked()
+                          .As<v8::TypedArray>();
+    v8::Local<v8::ArrayBuffer> jsobj = nodeBuffer.As<v8::TypedArray>()->Buffer();
+    #else
+    std::shared_ptr<v8::BackingStore> backingStore = v8::ArrayBuffer::NewBackingStore(contents, byteLength, freeFunc, freeUserData);
     v8::Local<v8::ArrayBuffer> jsobj = v8::ArrayBuffer::New(__isolate, backingStore);
+    #endif
+
     if (!jsobj.IsEmpty()) {
         obj = Object::_createJSObject(nullptr, jsobj);
     }
@@ -248,13 +268,20 @@ Object *Object::createTypedArray(TypedArrayType type, const void *data, size_t b
         SE_LOGE("Doesn't support to create Uint8ClampedArray with Object::createTypedArray API!");
         return nullptr;
     }
-
+    #if CC_EDITOR && CC_PLATFORM == CC_PLATFORM_WINDOWS
+    auto nodeBuffer = node::Buffer::New(__isolate, byteLength);
+    auto *srcData = node::Buffer::Data(nodeBuffer.ToLocalChecked());
+    v8::Local<v8::ArrayBuffer> jsobj = nodeBuffer.ToLocalChecked().As<v8::TypedArray>()->Buffer();
+    #else
     v8::Local<v8::ArrayBuffer> jsobj = v8::ArrayBuffer::New(__isolate, byteLength);
+    auto *srcData = jsobj->GetBackingStore()->Data();
+    #endif
+
     // If data has content,then will copy data into buffer,or will only clear buffer.
     if (data) {
-        memcpy(jsobj->GetBackingStore()->Data(), data, byteLength);
+        memcpy(srcData, data, byteLength);
     } else {
-        memset(jsobj->GetBackingStore()->Data(), 0, byteLength);
+        memset(srcData, 0, byteLength);
     }
 
     v8::Local<v8::Object> arr;
@@ -284,7 +311,7 @@ Object *Object::createTypedArray(TypedArrayType type, const void *data, size_t b
             arr = v8::Float64Array::New(jsobj, 0, byteLength / 8);
             break;
         default:
-            CC_ASSERT(false); // Should never go here.
+            CC_ABORT(); // Should never go here.
             break;
     }
 
@@ -299,7 +326,7 @@ Object *Object::createTypedArrayWithBuffer(TypedArrayType type, const Object *ob
 Object *Object::createTypedArrayWithBuffer(TypedArrayType type, const Object *obj, size_t offset) {
     size_t byteLength{0};
     uint8_t *skip{nullptr};
-    obj->getTypedArrayData(&skip, &byteLength);
+    obj->getArrayBufferData(&skip, &byteLength);
     return Object::createTypedArrayWithBuffer(type, obj, offset, byteLength - offset);
 }
 
@@ -343,7 +370,7 @@ Object *Object::createTypedArrayWithBuffer(TypedArrayType type, const Object *ob
             typedArray = v8::Float64Array::New(jsobj, offset, byteLength / 8);
             break;
         default:
-            CC_ASSERT(false); // Should never go here.
+            CC_ABORT(); // Should never go here.
             break;
     }
 
@@ -385,7 +412,7 @@ bool Object::init(Class *cls, v8::Local<v8::Object> obj) {
 }
 
 bool Object::getProperty(const char *name, Value *data, bool cachePropertyName) {
-    CC_ASSERT(data != nullptr);
+    CC_ASSERT_NOT_NULL(data);
     data->setUndefined();
 
     v8::HandleScope handleScope(__isolate);
@@ -470,7 +497,7 @@ bool Object::setProperty(const char *name, const Value &data) {
     return true;
 }
 
-bool Object::defineProperty(const char *name, v8::AccessorNameGetterCallback getter, v8::AccessorNameSetterCallback setter) {
+bool Object::defineProperty(const char *name, v8::FunctionCallback getter, v8::FunctionCallback setter) {
     v8::MaybeLocal<v8::String> nameValue = v8::String::NewFromUtf8(__isolate, name, v8::NewStringType::kNormal);
     if (nameValue.IsEmpty()) {
         return false;
@@ -478,8 +505,19 @@ bool Object::defineProperty(const char *name, v8::AccessorNameGetterCallback get
 
     v8::Local<v8::String> nameValChecked = nameValue.ToLocalChecked();
     v8::Local<v8::Name> jsName = v8::Local<v8::Name>::Cast(nameValChecked);
-    v8::Maybe<bool> ret = _obj.handle(__isolate)->SetAccessor(__isolate->GetCurrentContext(), jsName, getter, setter);
-    return ret.IsJust() && ret.FromJust();
+    v8::Local<v8::Context> currentContext = __isolate->GetCurrentContext();
+
+    v8::MaybeLocal<v8::Function> v8Getter = v8::Function::New(currentContext, getter);
+    v8::MaybeLocal<v8::Function> v8Setter = v8::Function::New(currentContext, setter);
+    if (!v8Getter.IsEmpty() && !v8Setter.IsEmpty()) {
+        _obj.handle(__isolate)->SetAccessorProperty(jsName, v8Getter.ToLocalChecked(), v8Setter.ToLocalChecked());
+    } else if (v8Getter.IsEmpty()) {
+        _obj.handle(__isolate)->SetAccessorProperty(jsName, {}, v8Setter.ToLocalChecked());
+    } else if (v8Setter.IsEmpty()) {
+        _obj.handle(__isolate)->SetAccessorProperty(jsName, v8Getter.ToLocalChecked(), {});
+    }
+
+    return true;
 }
 
 bool Object::defineOwnProperty(const char *name, const se::Value &value, bool writable, bool enumerable, bool configurable) {
@@ -555,12 +593,21 @@ Object::TypedArrayType Object::getTypedArrayType() const {
 bool Object::getTypedArrayData(uint8_t **ptr, size_t *length) const {
     CC_ASSERT(isTypedArray());
     v8::Local<v8::Object> obj = const_cast<Object *>(this)->_obj.handle(__isolate);
+    #if CC_EDITOR && CC_PLATFORM == CC_PLATFORM_WINDOWS
+    char *data = node::Buffer::Data(obj);
+    *ptr = reinterpret_cast<uint8_t *>(data);
+    if (length) {
+        *length = node::Buffer::Length(obj);
+    }
+    #else
     v8::Local<v8::TypedArray> arr = v8::Local<v8::TypedArray>::Cast(obj);
     const auto &backingStore = arr->Buffer()->GetBackingStore();
     *ptr = static_cast<uint8_t *>(backingStore->Data()) + arr->ByteOffset();
     if (length) {
         *length = arr->ByteLength();
     }
+    #endif
+
     return true;
 }
 
@@ -571,6 +618,15 @@ bool Object::isArrayBuffer() const {
 
 bool Object::getArrayBufferData(uint8_t **ptr, size_t *length) const {
     CC_ASSERT(isArrayBuffer());
+    #if CC_EDITOR && CC_PLATFORM == CC_PLATFORM_WINDOWS
+    v8::Local<v8::ArrayBuffer> jsobj = _getJSObject().As<v8::ArrayBuffer>();
+    auto obj = v8::Int8Array::New(jsobj, 0, jsobj->ByteLength());
+    char *data = node::Buffer::Data(obj.As<v8::Value>());
+    *ptr = reinterpret_cast<uint8_t *>(data);
+    if (length) {
+        *length = node::Buffer::Length(obj.As<v8::Value>());
+    }
+    #else
     v8::Local<v8::Object> obj = const_cast<Object *>(this)->_obj.handle(__isolate);
     v8::Local<v8::ArrayBuffer> arrBuf = v8::Local<v8::ArrayBuffer>::Cast(obj);
     const auto &backingStore = arrBuf->GetBackingStore();
@@ -578,12 +634,12 @@ bool Object::getArrayBufferData(uint8_t **ptr, size_t *length) const {
     if (length) {
         *length = backingStore->ByteLength();
     }
-
+    #endif
     return true;
 }
 
 void Object::setPrivateObject(PrivateObjectBase *data) {
-    CC_ASSERT(_privateObject == nullptr);
+    CC_ASSERT_NULL(_privateObject);
     #if CC_DEBUG
     // CC_ASSERT(!NativePtrToObjectMap::contains(data->getRaw()));
     if (data != nullptr) {
@@ -594,7 +650,7 @@ void Object::setPrivateObject(PrivateObjectBase *data) {
         #if JSB_TRACK_OBJECT_CREATION
                 SE_LOGE(" previous object created at %s\n", it->second->_objectCreationStackFrame.c_str());
         #endif
-                CC_ASSERT(false);
+                CC_ABORT();
             });
     }
     #endif
@@ -690,7 +746,7 @@ bool Object::call(const ValueArray &args, Object *thisObject, Value *rval /* = n
     SE_REPORT_ERROR("Invoking function (%p) failed!", this);
     se::ScriptEngine::getInstance()->clearException();
 
-    //        CC_ASSERT(false);
+    //        CC_ABORT();
 
     return false;
 }
@@ -736,7 +792,7 @@ bool Object::isArray() const {
 
 bool Object::getArrayLength(uint32_t *length) const {
     CC_ASSERT(isArray());
-    CC_ASSERT(length != nullptr);
+    CC_ASSERT_NOT_NULL(length);
     auto *thiz = const_cast<Object *>(this);
 
     v8::Local<v8::Array> v8Arr = v8::Local<v8::Array>::Cast(thiz->_obj.handle(__isolate));
@@ -746,7 +802,7 @@ bool Object::getArrayLength(uint32_t *length) const {
 
 bool Object::getArrayElement(uint32_t index, Value *data) const {
     CC_ASSERT(isArray());
-    CC_ASSERT(data != nullptr);
+    CC_ASSERT_NOT_NULL(data);
     auto *thiz = const_cast<Object *>(this);
     v8::MaybeLocal<v8::Value> result = thiz->_obj.handle(__isolate)->Get(__isolate->GetCurrentContext(), index);
 
@@ -769,7 +825,7 @@ bool Object::setArrayElement(uint32_t index, const Value &data) {
 }
 
 bool Object::getAllKeys(ccstd::vector<ccstd::string> *allKeys) const {
-    CC_ASSERT(allKeys != nullptr);
+    CC_ASSERT_NOT_NULL(allKeys);
     auto *thiz = const_cast<Object *>(this);
     v8::Local<v8::Context> context = __isolate->GetCurrentContext();
     v8::MaybeLocal<v8::Array> keys = thiz->_obj.handle(__isolate)->GetOwnPropertyNames(context);
@@ -952,7 +1008,7 @@ Class *Object::_getClass() const { // NOLINT(readability-identifier-naming)
 }
 
 void Object::_setFinalizeCallback(V8FinalizeFunc finalizeCb) { // NOLINT(readability-identifier-naming)
-    CC_ASSERT(finalizeCb != nullptr);
+    CC_ASSERT_NOT_NULL(finalizeCb);
     _finalizeCb = finalizeCb;
 }
 

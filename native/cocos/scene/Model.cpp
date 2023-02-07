@@ -1,18 +1,17 @@
 /****************************************************************************
- Copyright (c) 2021 Xiamen Yaji Software Co., Ltd.
+ Copyright (c) 2021-2023 Xiamen Yaji Software Co., Ltd.
 
  http://www.cocos.com
 
  Permission is hereby granted, free of charge, to any person obtaining a copy
- of this software and associated engine source code (the "Software"), a limited,
- worldwide, royalty-free, non-assignable, revocable and non-exclusive license
- to use Cocos Creator solely to develop games on your target platforms. You shall
- not use Cocos Creator software for developing other software or tools that's
- used for developing games. You are not granted to publish, distribute,
- sublicense, and/or sell copies of Cocos Creator.
+ of this software and associated documentation files (the "Software"), to deal
+ in the Software without restriction, including without limitation the rights to
+ use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+ of the Software, and to permit persons to whom the Software is furnished to do so,
+ subject to the following conditions:
 
- The software or tools in this License Agreement are licensed, not sold.
- Xiamen Yaji Software Co., Ltd. reserves all rights not expressly granted to you.
+ The above copyright notice and this permission notice shall be included in
+ all copies or substantial portions of the Software.
 
  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -21,13 +20,15 @@
  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  THE SOFTWARE.
- ****************************************************************************/
+****************************************************************************/
 #include "base/std/container/array.h"
 
 // #include "core/Director.h"
 #include "core/Root.h"
 #include "core/TypedArray.h"
 #include "core/assets/Material.h"
+#include "core/scene-graph/Scene.h"
+#include "core/scene-graph/SceneGlobals.h"
 #include "gfx-base/GFXTexture.h"
 #include "gi/light-probe/LightProbe.h"
 #include "gi/light-probe/SH.h"
@@ -61,6 +62,9 @@ const cc::gfx::SamplerInfo LIGHTMAP_SAMPLER_WITH_MIP_HASH{
 
 const ccstd::vector<cc::scene::IMacroPatch> SHADOW_MAP_PATCHES{{"CC_RECEIVE_SHADOW", true}};
 const ccstd::vector<cc::scene::IMacroPatch> LIGHT_PROBE_PATCHES{{"CC_USE_LIGHT_PROBE", true}};
+const ccstd::string CC_USE_REFLECTION_PROBE = "CC_USE_REFLECTION_PROBE";
+const ccstd::vector<cc::scene::IMacroPatch> STATIC_LIGHTMAP_PATHES{{"CC_USE_LIGHTMAP", 1}};
+const ccstd::vector<cc::scene::IMacroPatch> STATIONARY_LIGHTMAP_PATHES{{"CC_USE_LIGHTMAP", 2}};
 } // namespace
 
 namespace cc {
@@ -79,6 +83,8 @@ void Model::initialize() {
     _enabled = true;
     _visFlags = Layers::Enum::NONE;
     _inited = true;
+    _bakeToReflectionProbe = true;
+    _reflectionProbeType = 0;
 }
 
 void Model::destroy() {
@@ -167,6 +173,10 @@ void Model::updateUBOs(uint32_t stamp) {
 
     updateSHUBOs();
 
+    const auto *pipeline = Root::getInstance()->getPipeline();
+    const auto *shadowInfo = pipeline->getPipelineSceneData()->getShadows();
+    const auto forceUpdateUBO = shadowInfo->isEnabled() && shadowInfo->getType() == ShadowType::PLANAR;
+
     if (!_localDataUpdated) {
         return;
     }
@@ -184,7 +194,7 @@ void Model::updateUBOs(uint32_t stamp) {
         }
     }
 
-    if (hasNonInstancingPass && _localBuffer) {
+    if ((hasNonInstancingPass || forceUpdateUBO) && _localBuffer) {
         Mat4 mat4;
         Mat4::inverseTranspose(worldMatrix, &mat4);
 
@@ -385,8 +395,8 @@ void Model::updateSHUBOs() {
     const auto *lightProbes = pipeline->getPipelineSceneData()->getLightProbes();
 
     _lastWorldBoundCenter.set(center);
-    _tetrahedronIndex = lightProbes->getData().getInterpolationWeights(center, _tetrahedronIndex, weights);
-    bool result = lightProbes->getData().getInterpolationSHCoefficients(_tetrahedronIndex, weights, coefficients);
+    _tetrahedronIndex = lightProbes->getData()->getInterpolationWeights(center, _tetrahedronIndex, weights);
+    bool result = lightProbes->getData()->getInterpolationSHCoefficients(_tetrahedronIndex, weights, coefficients);
     if (!result) {
         return;
     }
@@ -420,6 +430,25 @@ ccstd::vector<IMacroPatch> Model::getMacroPatches(index_t subModelIndex) {
     if (_useLightProbe) {
         for (const auto &patch : LIGHT_PROBE_PATCHES) {
             patches.push_back(patch);
+        }
+    }
+
+    patches.push_back({CC_USE_REFLECTION_PROBE, _reflectionProbeType});
+
+    if (_lightmap != nullptr) {
+        bool stationary = false;
+        if (getNode() != nullptr && getNode()->getScene() != nullptr) {
+            stationary = getNode()->getScene()->getSceneGlobals()->getBakedWithStationaryMainLight();
+        }
+
+        if (stationary) {
+            for (const auto &patch : STATIONARY_LIGHTMAP_PATHES) {
+                patches.push_back(patch);
+            }
+        } else {
+            for (const auto &patch : STATIC_LIGHTMAP_PATHES) {
+                patches.push_back(patch);
+            }
         }
     }
 
@@ -543,7 +572,7 @@ void Model::updateLocalShadowBias() {
     _localDataUpdated = true;
 }
 
-void Model::updateReflctionProbeCubemap(TextureCube *texture) {
+void Model::updateReflectionProbeCubemap(TextureCube *texture) {
     _localDataUpdated = true;
     if (texture == nullptr) {
         texture = BuiltinResMgr::getInstance()->get<TextureCube>(ccstd::string("default-cube-texture"));
@@ -559,7 +588,7 @@ void Model::updateReflctionProbeCubemap(TextureCube *texture) {
         }
     }
 }
-void Model::updateReflctionProbePlanarMap(gfx::Texture *texture) {
+void Model::updateReflectionProbePlanarMap(gfx::Texture *texture) {
     _localDataUpdated = true;
 
     gfx::Texture *bindingTexture = texture;
@@ -589,6 +618,13 @@ void Model::setInstancedAttribute(const ccstd::string &name, const float *value,
     for (const auto &subModel : _subModels) {
         subModel->setInstancedAttribute(name, value, byteLength);
     }
+}
+void Model::setReflectionProbeType(int32_t val) {
+    _reflectionProbeType = val;
+    for (const auto &subModel : _subModels) {
+        subModel->setReflectionProbeType(val);
+    }
+    onMacroPatchesStateChanged();
 }
 
 } // namespace scene

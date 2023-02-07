@@ -1,19 +1,18 @@
 /* eslint-disable new-cap */
 /*
- Copyright (c) 2020 Xiamen Yaji Software Co., Ltd.
+ Copyright (c) 2020-2023 Xiamen Yaji Software Co., Ltd.
 
  https://www.cocos.com/
 
  Permission is hereby granted, free of charge, to any person obtaining a copy
- of this software and associated engine source code (the "Software"), a limited,
- worldwide, royalty-free, non-assignable, revocable and non-exclusive license
- to use Cocos Creator solely to develop games on your target platforms. You shall
- not use Cocos Creator software for developing other software or tools that's
- used for developing games. You are not granted to publish, distribute,
- sublicense, and/or sell copies of Cocos Creator.
+ of this software and associated documentation files (the "Software"), to deal
+ in the Software without restriction, including without limitation the rights to
+ use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+ of the Software, and to permit persons to whom the Software is furnished to do so,
+ subject to the following conditions:
 
- The software or tools in this License Agreement are licensed, not sold.
- Xiamen Yaji Software Co., Ltd. reserves all rights not expressly granted to you.
+ The above copyright notice and this permission notice shall be included in
+ all copies or substantial portions of the Software.
 
  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -22,7 +21,7 @@
  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  THE SOFTWARE.
- */
+*/
 
 import { BulletSharedBody } from './bullet-shared-body';
 import { BulletRigidBody } from './bullet-rigid-body';
@@ -36,7 +35,7 @@ import { PhysicsRayResult, PhysicsMaterial } from '../framework';
 import { error, RecyclePool, Vec3, js, IVec3Like, geometry } from '../../core';
 import { BulletContactData } from './bullet-contact-data';
 import { BulletConstraint } from './constraints/bullet-constraint';
-import { bt } from './instantiated';
+import { bt, EBulletType, EBulletTriangleRaycastFlag } from './instantiated';
 import { Node } from '../../scene-graph';
 
 const contactsPool: BulletContactData[] = [];
@@ -115,10 +114,10 @@ export class BulletWorld implements IPhysicsWorld {
 
     destroy (): void {
         if (this.constraints.length || this.bodies.length) error('You should destroy all physics component first.');
-        bt.CollisionWorld_del(this._world);
-        bt.DbvtBroadphase_del(this._broadphase);
-        bt.CollisionDispatcher_del(this._dispatcher);
-        bt.SequentialImpulseConstraintSolver_del(this._solver);
+        bt._safe_delete(this._world, EBulletType.EBulletTypeCollisionWorld);
+        bt._safe_delete(this._broadphase, EBulletType.EBulletTypeDbvtBroadPhase);
+        bt._safe_delete(this._dispatcher, EBulletType.EBulletTypeCollisionDispatcher);
+        bt._safe_delete(this._solver, EBulletType.EBulletTypeSequentialImpulseConstraintSolver);
         (this as any).bodies = null;
         (this as any).ghosts = null;
         (this as any).constraints = null;
@@ -161,6 +160,7 @@ export class BulletWorld implements IPhysicsWorld {
         const from = cocos2BulletVec3(BulletCache.instance.BT_V3_1, worldRay.o);
         const allHitsCB = bt.ccAllRayCallback_static();
         bt.ccAllRayCallback_reset(allHitsCB, from, to, options.mask, options.queryTrigger);
+        bt.ccAllRayCallback_setFlags(allHitsCB, EBulletTriangleRaycastFlag.UseSubSimplexConvexCastRaytest);
         bt.CollisionWorld_rayTest(this._world, from, to, allHitsCB);
         if (bt.RayCallback_hasHit(allHitsCB)) {
             const posArray = bt.ccAllRayCallback_getHitPointWorld(allHitsCB);
@@ -184,6 +184,7 @@ export class BulletWorld implements IPhysicsWorld {
         const from = cocos2BulletVec3(BulletCache.instance.BT_V3_1, worldRay.o);
         const closeHitCB = bt.ccClosestRayCallback_static();
         bt.ccClosestRayCallback_reset(closeHitCB, from, to, options.mask, options.queryTrigger);
+        bt.ccClosestRayCallback_setFlags(closeHitCB, EBulletTriangleRaycastFlag.UseSubSimplexConvexCastRaytest);
         bt.CollisionWorld_rayTest(this._world, from, to, closeHitCB);
         if (bt.RayCallback_hasHit(closeHitCB)) {
             bullet2CocosVec3(v3_0, bt.ccClosestRayCallback_getHitPointWorld(closeHitCB));

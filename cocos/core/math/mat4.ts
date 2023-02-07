@@ -1,18 +1,17 @@
 /*
- Copyright (c) 2018-2020 Xiamen Yaji Software Co., Ltd.
+ Copyright (c) 2018-2023 Xiamen Yaji Software Co., Ltd.
 
  http://www.cocos.com
 
  Permission is hereby granted, free of charge, to any person obtaining a copy
- of this software and associated engine source code (the "Software"), a limited,
- worldwide, royalty-free, non-assignable, revocable and non-exclusive license
- to use Cocos Creator solely to develop games on your target platforms. You shall
- not use Cocos Creator software for developing other software or tools that's
- used for developing games. You are not granted to publish, distribute,
- sublicense, and/or sell copies of Cocos Creator.
+ of this software and associated documentation files (the "Software"), to deal
+ in the Software without restriction, including without limitation the rights to
+ use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+ of the Software, and to permit persons to whom the Software is furnished to do so,
+ subject to the following conditions:
 
- The software or tools in this License Agreement are licensed, not sold.
- Xiamen Yaji Software Co., Ltd. reserves all rights not expressly granted to you.
+ The above copyright notice and this permission notice shall be included in
+ all copies or substantial portions of the Software.
 
  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -1421,97 +1420,97 @@ export class Mat4 extends ValueType {
      * @en Value at column 0 row 0 of the matrix.
      * @zh 矩阵第 0 列第 0 行的元素。
      */
-    public m00: number;
+    public declare m00: number;
 
     /**
      * @en Value at column 0 row 1 of the matrix.
      * @zh 矩阵第 0 列第 1 行的元素。
      */
-    public m01: number;
+    public declare m01: number;
 
     /**
      * @en Value at column 0 row 2 of the matrix.
      * @zh 矩阵第 0 列第 2 行的元素。
      */
-    public m02: number;
+    public declare m02: number;
 
     /**
      * @en Value at column 0 row 3 of the matrix.
      * @zh 矩阵第 0 列第 3 行的元素。
      */
-    public m03: number;
+    public declare m03: number;
 
     /**
      * @en Value at column 1 row 0 of the matrix.
      * @zh 矩阵第 1 列第 0 行的元素。
      */
-    public m04: number;
+    public declare m04: number;
 
     /**
      * @en Value at column 1 row 1 of the matrix.
      * @zh 矩阵第 1 列第 1 行的元素。
      */
-    public m05: number;
+    public declare m05: number;
 
     /**
      * @en Value at column 1 row 2 of the matrix.
      * @zh 矩阵第 1 列第 2 行的元素。
      */
-    public m06: number;
+    public declare m06: number;
 
     /**
      * @en Value at column 1 row 3 of the matrix.
      * @zh 矩阵第 1 列第 3 行的元素。
      */
-    public m07: number;
+    public declare m07: number;
 
     /**
      * @en Value at column 2 row 0 of the matrix.
      * @zh 矩阵第 2 列第 0 行的元素。
      */
-    public m08: number;
+    public declare m08: number;
 
     /**
      * @en Value at column 2 row 1 of the matrix.
      * @zh 矩阵第 2 列第 1 行的元素。
      */
-    public m09: number;
+    public declare m09: number;
 
     /**
      * @en Value at column 2 row 2 of the matrix.
      * @zh 矩阵第 2 列第 2 行的元素。
      */
-    public m10: number;
+    public declare m10: number;
 
     /**
      * @en Value at column 2 row 3 of the matrix.
      * @zh 矩阵第 2 列第 3 行的元素。
      */
-    public m11: number;
+    public declare m11: number;
 
     /**
      * @en Value at column 3 row 0 of the matrix.
      * @zh 矩阵第 3 列第 0 行的元素。
      */
-    public m12: number;
+    public declare m12: number;
 
     /**
      * @en Value at column 3 row 1 of the matrix.
      * @zh 矩阵第 3 列第 1 行的元素。
      */
-    public m13: number;
+    public declare m13: number;
 
     /**
      * @en Value at column 3 row 2 of the matrix.
      * @zh 矩阵第 3 列第 2 行的元素。
      */
-    public m14: number;
+    public declare m14: number;
 
     /**
      * @en Value at column 3 row 3 of the matrix.
      * @zh 矩阵第 3 列第 3 行的元素。
      */
-    public m15: number;
+    public declare m15: number;
 
     constructor(other: Mat4);
 
@@ -1996,7 +1995,7 @@ export class Mat4 extends ValueType {
 
     /**
      * @en Returns the translation vector component of a transformation matrix.
-     * @zh 从当前矩阵中计算出位移变换的部分，并以各个轴上位移的形式赋值给出口向量。
+     * @zh 从当前矩阵中计算出位移变换的部分，并以各个轴上位移的形式赋值给输出向量。
      * @param out Vector to receive translation component.
      */
     public getTranslation (out: Vec3) {
@@ -2009,7 +2008,7 @@ export class Mat4 extends ValueType {
 
     /**
      * @en Returns the scale factor component of a transformation matrix
-     * @zh 从当前矩阵中计算出缩放变换的部分，并以各个轴上缩放的形式赋值给出口向量。
+     * @zh 从当前矩阵中计算出缩放变换的部分，并以各个轴上缩放的形式赋值给输出向量。
      * @param out Vector to receive scale component
      */
     public getScale (out: Vec3) {
@@ -2032,7 +2031,7 @@ export class Mat4 extends ValueType {
 
     /**
      * @en Returns the rotation factor component of a transformation matrix
-     * @zh 从当前矩阵中计算出旋转变换的部分，并以四元数的形式赋值给出口四元数。
+     * @zh 从当前矩阵中计算出旋转变换的部分，并以四元数的形式赋值给输出四元数。
      * @param out Vector to receive rotation component
      */
     public getRotation (out: Quat) {

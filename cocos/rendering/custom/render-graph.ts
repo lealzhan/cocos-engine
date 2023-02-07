@@ -1,18 +1,17 @@
 /****************************************************************************
- Copyright (c) 2021-2022 Xiamen Yaji Software Co., Ltd.
+ Copyright (c) 2021-2023 Xiamen Yaji Software Co., Ltd.
 
  http://www.cocos.com
 
  Permission is hereby granted, free of charge, to any person obtaining a copy
- of this software and associated engine source code (the "Software"), a limited,
- worldwide, royalty-free, non-assignable, revocable and non-exclusive license
- to use Cocos Creator solely to develop games on your target platforms. You shall
- not use Cocos Creator software for developing other software or tools that's
- used for developing games. You are not granted to publish, distribute,
- sublicense, and/or sell copies of Cocos Creator.
+ of this software and associated documentation files (the "Software"), to deal
+ in the Software without restriction, including without limitation the rights to
+ use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+ of the Software, and to permit persons to whom the Software is furnished to do so,
+ subject to the following conditions:
 
- The software or tools in this License Agreement are licensed, not sold.
- Xiamen Yaji Software Co., Ltd. reserves all rights not expressly granted to you.
+ The above copyright notice and this permission notice shall be included in
+ all copies or substantial portions of the Software.
 
  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -29,7 +28,7 @@
  * ========================= !DO NOT CHANGE THE FOLLOWING SECTION MANUALLY! =========================
  */
 /* eslint-disable max-len */
-import * as impl from './graph';
+import { AdjI, AdjacencyGraph, BidirectionalGraph, ComponentGraph, ED, InEI, MutableGraph, MutableReferenceGraph, NamedGraph, OutE, OutEI, PolymorphicGraph, PropertyGraph, PropertyMap, ReferenceGraph, UuidGraph, VertexListGraph, directional, parallel, reindexEdgeList, traversal } from './graph';
 import { Material } from '../../asset/assets';
 import { Camera } from '../../render-scene/scene/camera';
 import { AccessFlagBit, Buffer, ClearFlagBit, Color, Format, Framebuffer, SampleCount, Sampler, SamplerInfo, Swapchain, Texture, TextureFlagBit, Viewport } from '../../gfx';
@@ -115,7 +114,7 @@ export function getResourceGraphValueName (e: ResourceGraphValue): string {
     }
 }
 
-interface ResourceGraphValueType {
+export interface ResourceGraphValueType {
     [ResourceGraphValue.Managed]: ManagedResource
     [ResourceGraphValue.ManagedBuffer]: ManagedBuffer
     [ResourceGraphValue.ManagedTexture]: ManagedTexture
@@ -135,7 +134,7 @@ export interface ResourceGraphVisitor {
     swapchain(value: RenderSwapchain): unknown;
 }
 
-type ResourceGraphObject = ManagedResource
+export type ResourceGraphObject = ManagedResource
 | ManagedBuffer
 | ManagedTexture
 | Buffer
@@ -153,15 +152,15 @@ export class ResourceGraphVertex {
         this._id = id;
         this._object = object;
     }
-    readonly _outEdges: impl.OutE[] = [];
-    readonly _inEdges: impl.OutE[] = [];
+    readonly _outEdges: OutE[] = [];
+    readonly _inEdges: OutE[] = [];
     readonly _id: ResourceGraphValue;
     _object: ResourceGraphObject;
 }
 
 //-----------------------------------------------------------------
 // PropertyGraph Concept
-export class ResourceGraphNameMap implements impl.PropertyMap {
+export class ResourceGraphNameMap implements PropertyMap {
     constructor (readonly names: string[]) {
         this._names = names;
     }
@@ -174,7 +173,7 @@ export class ResourceGraphNameMap implements impl.PropertyMap {
     readonly _names: string[];
 }
 
-export class ResourceGraphDescMap implements impl.PropertyMap {
+export class ResourceGraphDescMap implements PropertyMap {
     constructor (readonly descs: ResourceDesc[]) {
         this._descs = descs;
     }
@@ -184,7 +183,7 @@ export class ResourceGraphDescMap implements impl.PropertyMap {
     readonly _descs: ResourceDesc[];
 }
 
-export class ResourceGraphTraitsMap implements impl.PropertyMap {
+export class ResourceGraphTraitsMap implements PropertyMap {
     constructor (readonly traits: ResourceTraits[]) {
         this._traits = traits;
     }
@@ -194,7 +193,7 @@ export class ResourceGraphTraitsMap implements impl.PropertyMap {
     readonly _traits: ResourceTraits[];
 }
 
-export class ResourceGraphStatesMap implements impl.PropertyMap {
+export class ResourceGraphStatesMap implements PropertyMap {
     constructor (readonly states: ResourceStates[]) {
         this._states = states;
     }
@@ -204,7 +203,7 @@ export class ResourceGraphStatesMap implements impl.PropertyMap {
     readonly _states: ResourceStates[];
 }
 
-export class ResourceGraphSamplerMap implements impl.PropertyMap {
+export class ResourceGraphSamplerMap implements PropertyMap {
     constructor (readonly samplerInfo: SamplerInfo[]) {
         this._samplerInfo = samplerInfo;
     }
@@ -224,7 +223,7 @@ export const enum ResourceGraphComponent {
     Sampler,
 }
 
-interface ResourceGraphComponentType {
+export interface ResourceGraphComponentType {
     [ResourceGraphComponent.Name]: string;
     [ResourceGraphComponent.Desc]: ResourceDesc;
     [ResourceGraphComponent.Traits]: ResourceTraits;
@@ -232,7 +231,7 @@ interface ResourceGraphComponentType {
     [ResourceGraphComponent.Sampler]: SamplerInfo;
 }
 
-interface ResourceGraphComponentPropertyMap {
+export interface ResourceGraphComponentPropertyMap {
     [ResourceGraphComponent.Name]: ResourceGraphNameMap;
     [ResourceGraphComponent.Desc]: ResourceGraphDescMap;
     [ResourceGraphComponent.Traits]: ResourceGraphTraitsMap;
@@ -242,29 +241,29 @@ interface ResourceGraphComponentPropertyMap {
 
 //-----------------------------------------------------------------
 // ResourceGraph Implementation
-export class ResourceGraph implements impl.BidirectionalGraph
-, impl.AdjacencyGraph
-, impl.VertexListGraph
-, impl.MutableGraph
-, impl.PropertyGraph
-, impl.NamedGraph
-, impl.ComponentGraph
-, impl.PolymorphicGraph
-, impl.UuidGraph<string> {
+export class ResourceGraph implements BidirectionalGraph
+, AdjacencyGraph
+, VertexListGraph
+, MutableGraph
+, PropertyGraph
+, NamedGraph
+, ComponentGraph
+, PolymorphicGraph
+, UuidGraph<string> {
     //-----------------------------------------------------------------
     // Graph
     // type vertex_descriptor = number;
     nullVertex (): number { return 0xFFFFFFFF; }
-    // type edge_descriptor = impl.ED;
-    readonly directed_category: impl.directional = impl.directional.bidirectional;
-    readonly edge_parallel_category: impl.parallel = impl.parallel.allow;
-    readonly traversal_category: impl.traversal = impl.traversal.incidence
-        | impl.traversal.bidirectional
-        | impl.traversal.adjacency
-        | impl.traversal.vertex_list;
+    // type edge_descriptor = ED;
+    readonly directed_category: directional = directional.bidirectional;
+    readonly edge_parallel_category: parallel = parallel.allow;
+    readonly traversal_category: traversal = traversal.incidence
+        | traversal.bidirectional
+        | traversal.adjacency
+        | traversal.vertex_list;
     //-----------------------------------------------------------------
     // IncidenceGraph
-    // type out_edge_iterator = impl.OutEI;
+    // type out_edge_iterator = OutEI;
     // type degree_size_type = number;
     edge (u: number, v: number): boolean {
         for (const oe of this._vertices[u]._outEdges) {
@@ -274,23 +273,23 @@ export class ResourceGraph implements impl.BidirectionalGraph
         }
         return false;
     }
-    source (e: impl.ED): number {
+    source (e: ED): number {
         return e.source as number;
     }
-    target (e: impl.ED): number {
+    target (e: ED): number {
         return e.target as number;
     }
-    outEdges (v: number): impl.OutEI {
-        return new impl.OutEI(this._vertices[v]._outEdges.values(), v);
+    outEdges (v: number): OutEI {
+        return new OutEI(this._vertices[v]._outEdges.values(), v);
     }
     outDegree (v: number): number {
         return this._vertices[v]._outEdges.length;
     }
     //-----------------------------------------------------------------
     // BidirectionalGraph
-    // type in_edge_iterator = impl.InEI;
-    inEdges (v: number): impl.InEI {
-        return new impl.InEI(this._vertices[v]._inEdges.values(), v);
+    // type in_edge_iterator = InEI;
+    inEdges (v: number): InEI {
+        return new InEI(this._vertices[v]._inEdges.values(), v);
     }
     inDegree (v: number): number {
         return this._vertices[v]._inEdges.length;
@@ -300,9 +299,9 @@ export class ResourceGraph implements impl.BidirectionalGraph
     }
     //-----------------------------------------------------------------
     // AdjacencyGraph
-    // type adjacency_iterator = impl.AdjI;
-    adjacentVertices (v: number): impl.AdjI {
-        return new impl.AdjI(this, this.outEdges(v));
+    // type adjacency_iterator = AdjI;
+    adjacentVertices (v: number): AdjI {
+        return new AdjI(this, this.outEdges(v));
     }
     //-----------------------------------------------------------------
     // VertexListGraph
@@ -409,15 +408,15 @@ export class ResourceGraph implements impl.BidirectionalGraph
 
         for (let v = 0; v !== sz; ++v) {
             const vert = this._vertices[v];
-            impl.reindexEdgeList(vert._outEdges, u);
-            impl.reindexEdgeList(vert._inEdges, u);
+            reindexEdgeList(vert._outEdges, u);
+            reindexEdgeList(vert._inEdges, u);
         }
     }
-    addEdge (u: number, v: number): impl.ED | null {
+    addEdge (u: number, v: number): ED | null {
         // update in/out edge list
-        this._vertices[u]._outEdges.push(new impl.OutE(v));
-        this._vertices[v]._inEdges.push(new impl.OutE(u));
-        return new impl.ED(u, v);
+        this._vertices[u]._outEdges.push(new OutE(v));
+        this._vertices[v]._inEdges.push(new OutE(u));
+        return new ED(u, v);
     }
     removeEdges (u: number, v: number): void {
         const source = this._vertices[u];
@@ -439,7 +438,7 @@ export class ResourceGraph implements impl.BidirectionalGraph
             }
         }
     }
-    removeEdge (e: impl.ED): void {
+    removeEdge (e: ED): void {
         const u = e.source as number;
         const v = e.target as number;
         const source = this._vertices[u];
@@ -722,13 +721,13 @@ export class RasterSubpass {
 export class SubpassGraphVertex {
     constructor () {
     }
-    readonly _outEdges: impl.OutE[] = [];
-    readonly _inEdges: impl.OutE[] = [];
+    readonly _outEdges: OutE[] = [];
+    readonly _inEdges: OutE[] = [];
 }
 
 //-----------------------------------------------------------------
 // PropertyGraph Concept
-export class SubpassGraphNameMap implements impl.PropertyMap {
+export class SubpassGraphNameMap implements PropertyMap {
     constructor (readonly names: string[]) {
         this._names = names;
     }
@@ -741,7 +740,7 @@ export class SubpassGraphNameMap implements impl.PropertyMap {
     readonly _names: string[];
 }
 
-export class SubpassGraphSubpassMap implements impl.PropertyMap {
+export class SubpassGraphSubpassMap implements PropertyMap {
     constructor (readonly subpasses: RasterSubpass[]) {
         this._subpasses = subpasses;
     }
@@ -758,39 +757,39 @@ export const enum SubpassGraphComponent {
     Subpass,
 }
 
-interface SubpassGraphComponentType {
+export interface SubpassGraphComponentType {
     [SubpassGraphComponent.Name]: string;
     [SubpassGraphComponent.Subpass]: RasterSubpass;
 }
 
-interface SubpassGraphComponentPropertyMap {
+export interface SubpassGraphComponentPropertyMap {
     [SubpassGraphComponent.Name]: SubpassGraphNameMap;
     [SubpassGraphComponent.Subpass]: SubpassGraphSubpassMap;
 }
 
 //-----------------------------------------------------------------
 // SubpassGraph Implementation
-export class SubpassGraph implements impl.BidirectionalGraph
-, impl.AdjacencyGraph
-, impl.VertexListGraph
-, impl.MutableGraph
-, impl.PropertyGraph
-, impl.NamedGraph
-, impl.ComponentGraph {
+export class SubpassGraph implements BidirectionalGraph
+, AdjacencyGraph
+, VertexListGraph
+, MutableGraph
+, PropertyGraph
+, NamedGraph
+, ComponentGraph {
     //-----------------------------------------------------------------
     // Graph
     // type vertex_descriptor = number;
     nullVertex (): number { return 0xFFFFFFFF; }
-    // type edge_descriptor = impl.ED;
-    readonly directed_category: impl.directional = impl.directional.bidirectional;
-    readonly edge_parallel_category: impl.parallel = impl.parallel.allow;
-    readonly traversal_category: impl.traversal = impl.traversal.incidence
-        | impl.traversal.bidirectional
-        | impl.traversal.adjacency
-        | impl.traversal.vertex_list;
+    // type edge_descriptor = ED;
+    readonly directed_category: directional = directional.bidirectional;
+    readonly edge_parallel_category: parallel = parallel.allow;
+    readonly traversal_category: traversal = traversal.incidence
+        | traversal.bidirectional
+        | traversal.adjacency
+        | traversal.vertex_list;
     //-----------------------------------------------------------------
     // IncidenceGraph
-    // type out_edge_iterator = impl.OutEI;
+    // type out_edge_iterator = OutEI;
     // type degree_size_type = number;
     edge (u: number, v: number): boolean {
         for (const oe of this._vertices[u]._outEdges) {
@@ -800,23 +799,23 @@ export class SubpassGraph implements impl.BidirectionalGraph
         }
         return false;
     }
-    source (e: impl.ED): number {
+    source (e: ED): number {
         return e.source as number;
     }
-    target (e: impl.ED): number {
+    target (e: ED): number {
         return e.target as number;
     }
-    outEdges (v: number): impl.OutEI {
-        return new impl.OutEI(this._vertices[v]._outEdges.values(), v);
+    outEdges (v: number): OutEI {
+        return new OutEI(this._vertices[v]._outEdges.values(), v);
     }
     outDegree (v: number): number {
         return this._vertices[v]._outEdges.length;
     }
     //-----------------------------------------------------------------
     // BidirectionalGraph
-    // type in_edge_iterator = impl.InEI;
-    inEdges (v: number): impl.InEI {
-        return new impl.InEI(this._vertices[v]._inEdges.values(), v);
+    // type in_edge_iterator = InEI;
+    inEdges (v: number): InEI {
+        return new InEI(this._vertices[v]._inEdges.values(), v);
     }
     inDegree (v: number): number {
         return this._vertices[v]._inEdges.length;
@@ -826,9 +825,9 @@ export class SubpassGraph implements impl.BidirectionalGraph
     }
     //-----------------------------------------------------------------
     // AdjacencyGraph
-    // type adjacency_iterator = impl.AdjI;
-    adjacentVertices (v: number): impl.AdjI {
-        return new impl.AdjI(this, this.outEdges(v));
+    // type adjacency_iterator = AdjI;
+    adjacentVertices (v: number): AdjI {
+        return new AdjI(this, this.outEdges(v));
     }
     //-----------------------------------------------------------------
     // VertexListGraph
@@ -907,15 +906,15 @@ export class SubpassGraph implements impl.BidirectionalGraph
 
         for (let v = 0; v !== sz; ++v) {
             const vert = this._vertices[v];
-            impl.reindexEdgeList(vert._outEdges, u);
-            impl.reindexEdgeList(vert._inEdges, u);
+            reindexEdgeList(vert._outEdges, u);
+            reindexEdgeList(vert._inEdges, u);
         }
     }
-    addEdge (u: number, v: number): impl.ED | null {
+    addEdge (u: number, v: number): ED | null {
         // update in/out edge list
-        this._vertices[u]._outEdges.push(new impl.OutE(v));
-        this._vertices[v]._inEdges.push(new impl.OutE(u));
-        return new impl.ED(u, v);
+        this._vertices[u]._outEdges.push(new OutE(v));
+        this._vertices[v]._inEdges.push(new OutE(u));
+        return new ED(u, v);
     }
     removeEdges (u: number, v: number): void {
         const source = this._vertices[u];
@@ -937,7 +936,7 @@ export class SubpassGraph implements impl.BidirectionalGraph
             }
         }
     }
-    removeEdge (e: impl.ED): void {
+    removeEdge (e: ED): void {
         const u = e.source as number;
         const v = e.target as number;
         const source = this._vertices[u];
@@ -1025,6 +1024,8 @@ export class RasterPass {
     width = 0;
     height = 0;
     readonly viewport: Viewport = new Viewport();
+    versionName = '';
+    version = 0;
 }
 
 export class ComputePass {
@@ -1157,7 +1158,7 @@ export function getRenderGraphValueName (e: RenderGraphValue): string {
     }
 }
 
-interface RenderGraphValueType {
+export interface RenderGraphValueType {
     [RenderGraphValue.Raster]: RasterPass
     [RenderGraphValue.Compute]: ComputePass
     [RenderGraphValue.Copy]: CopyPass
@@ -1187,7 +1188,7 @@ export interface RenderGraphVisitor {
     viewport(value: Viewport): unknown;
 }
 
-type RenderGraphObject = RasterPass
+export type RenderGraphObject = RasterPass
 | ComputePass
 | CopyPass
 | MovePass
@@ -1210,17 +1211,17 @@ export class RenderGraphVertex {
         this._id = id;
         this._object = object;
     }
-    readonly _outEdges: impl.OutE[] = [];
-    readonly _inEdges: impl.OutE[] = [];
-    readonly _children: impl.OutE[] = [];
-    readonly _parents: impl.OutE[] = [];
+    readonly _outEdges: OutE[] = [];
+    readonly _inEdges: OutE[] = [];
+    readonly _children: OutE[] = [];
+    readonly _parents: OutE[] = [];
     readonly _id: RenderGraphValue;
     _object: RenderGraphObject;
 }
 
 //-----------------------------------------------------------------
 // PropertyGraph Concept
-export class RenderGraphNameMap implements impl.PropertyMap {
+export class RenderGraphNameMap implements PropertyMap {
     constructor (readonly names: string[]) {
         this._names = names;
     }
@@ -1233,7 +1234,7 @@ export class RenderGraphNameMap implements impl.PropertyMap {
     readonly _names: string[];
 }
 
-export class RenderGraphLayoutMap implements impl.PropertyMap {
+export class RenderGraphLayoutMap implements PropertyMap {
     constructor (readonly layoutNodes: string[]) {
         this._layoutNodes = layoutNodes;
     }
@@ -1246,7 +1247,7 @@ export class RenderGraphLayoutMap implements impl.PropertyMap {
     readonly _layoutNodes: string[];
 }
 
-export class RenderGraphDataMap implements impl.PropertyMap {
+export class RenderGraphDataMap implements PropertyMap {
     constructor (readonly data: RenderData[]) {
         this._data = data;
     }
@@ -1256,7 +1257,7 @@ export class RenderGraphDataMap implements impl.PropertyMap {
     readonly _data: RenderData[];
 }
 
-export class RenderGraphValidMap implements impl.PropertyMap {
+export class RenderGraphValidMap implements PropertyMap {
     constructor (readonly valid: boolean[]) {
         this._valid = valid;
     }
@@ -1278,14 +1279,14 @@ export const enum RenderGraphComponent {
     Valid,
 }
 
-interface RenderGraphComponentType {
+export interface RenderGraphComponentType {
     [RenderGraphComponent.Name]: string;
     [RenderGraphComponent.Layout]: string;
     [RenderGraphComponent.Data]: RenderData;
     [RenderGraphComponent.Valid]: boolean;
 }
 
-interface RenderGraphComponentPropertyMap {
+export interface RenderGraphComponentPropertyMap {
     [RenderGraphComponent.Name]: RenderGraphNameMap;
     [RenderGraphComponent.Layout]: RenderGraphLayoutMap;
     [RenderGraphComponent.Data]: RenderGraphDataMap;
@@ -1294,30 +1295,30 @@ interface RenderGraphComponentPropertyMap {
 
 //-----------------------------------------------------------------
 // RenderGraph Implementation
-export class RenderGraph implements impl.BidirectionalGraph
-, impl.AdjacencyGraph
-, impl.VertexListGraph
-, impl.MutableGraph
-, impl.PropertyGraph
-, impl.NamedGraph
-, impl.ComponentGraph
-, impl.PolymorphicGraph
-, impl.ReferenceGraph
-, impl.MutableReferenceGraph {
+export class RenderGraph implements BidirectionalGraph
+, AdjacencyGraph
+, VertexListGraph
+, MutableGraph
+, PropertyGraph
+, NamedGraph
+, ComponentGraph
+, PolymorphicGraph
+, ReferenceGraph
+, MutableReferenceGraph {
     //-----------------------------------------------------------------
     // Graph
     // type vertex_descriptor = number;
     nullVertex (): number { return 0xFFFFFFFF; }
-    // type edge_descriptor = impl.ED;
-    readonly directed_category: impl.directional = impl.directional.bidirectional;
-    readonly edge_parallel_category: impl.parallel = impl.parallel.allow;
-    readonly traversal_category: impl.traversal = impl.traversal.incidence
-        | impl.traversal.bidirectional
-        | impl.traversal.adjacency
-        | impl.traversal.vertex_list;
+    // type edge_descriptor = ED;
+    readonly directed_category: directional = directional.bidirectional;
+    readonly edge_parallel_category: parallel = parallel.allow;
+    readonly traversal_category: traversal = traversal.incidence
+        | traversal.bidirectional
+        | traversal.adjacency
+        | traversal.vertex_list;
     //-----------------------------------------------------------------
     // IncidenceGraph
-    // type out_edge_iterator = impl.OutEI;
+    // type out_edge_iterator = OutEI;
     // type degree_size_type = number;
     edge (u: number, v: number): boolean {
         for (const oe of this._vertices[u]._outEdges) {
@@ -1327,23 +1328,23 @@ export class RenderGraph implements impl.BidirectionalGraph
         }
         return false;
     }
-    source (e: impl.ED): number {
+    source (e: ED): number {
         return e.source as number;
     }
-    target (e: impl.ED): number {
+    target (e: ED): number {
         return e.target as number;
     }
-    outEdges (v: number): impl.OutEI {
-        return new impl.OutEI(this._vertices[v]._outEdges.values(), v);
+    outEdges (v: number): OutEI {
+        return new OutEI(this._vertices[v]._outEdges.values(), v);
     }
     outDegree (v: number): number {
         return this._vertices[v]._outEdges.length;
     }
     //-----------------------------------------------------------------
     // BidirectionalGraph
-    // type in_edge_iterator = impl.InEI;
-    inEdges (v: number): impl.InEI {
-        return new impl.InEI(this._vertices[v]._inEdges.values(), v);
+    // type in_edge_iterator = InEI;
+    inEdges (v: number): InEI {
+        return new InEI(this._vertices[v]._inEdges.values(), v);
     }
     inDegree (v: number): number {
         return this._vertices[v]._inEdges.length;
@@ -1353,9 +1354,9 @@ export class RenderGraph implements impl.BidirectionalGraph
     }
     //-----------------------------------------------------------------
     // AdjacencyGraph
-    // type adjacency_iterator = impl.AdjI;
-    adjacentVertices (v: number): impl.AdjI {
-        return new impl.AdjI(this, this.outEdges(v));
+    // type adjacency_iterator = AdjI;
+    adjacentVertices (v: number): AdjI {
+        return new AdjI(this, this.outEdges(v));
     }
     //-----------------------------------------------------------------
     // VertexListGraph
@@ -1406,8 +1407,8 @@ export class RenderGraph implements impl.BidirectionalGraph
 
         // ReferenceGraph
         if (u !== 0xFFFFFFFF) {
-            this._vertices[u]._children.push(new impl.OutE(v));
-            vert._parents.push(new impl.OutE(u));
+            this._vertices[u]._children.push(new OutE(v));
+            vert._parents.push(new OutE(u));
         }
 
         return v;
@@ -1481,18 +1482,18 @@ export class RenderGraph implements impl.BidirectionalGraph
 
         for (let v = 0; v !== sz; ++v) {
             const vert = this._vertices[v];
-            impl.reindexEdgeList(vert._outEdges, u);
-            impl.reindexEdgeList(vert._inEdges, u);
+            reindexEdgeList(vert._outEdges, u);
+            reindexEdgeList(vert._inEdges, u);
             // ReferenceGraph (Separated)
-            impl.reindexEdgeList(vert._children, u);
-            impl.reindexEdgeList(vert._parents, u);
+            reindexEdgeList(vert._children, u);
+            reindexEdgeList(vert._parents, u);
         }
     }
-    addEdge (u: number, v: number): impl.ED | null {
+    addEdge (u: number, v: number): ED | null {
         // update in/out edge list
-        this._vertices[u]._outEdges.push(new impl.OutE(v));
-        this._vertices[v]._inEdges.push(new impl.OutE(u));
-        return new impl.ED(u, v);
+        this._vertices[u]._outEdges.push(new OutE(v));
+        this._vertices[v]._inEdges.push(new OutE(u));
+        return new ED(u, v);
     }
     removeEdges (u: number, v: number): void {
         const source = this._vertices[u];
@@ -1514,7 +1515,7 @@ export class RenderGraph implements impl.BidirectionalGraph
             }
         }
     }
-    removeEdge (e: impl.ED): void {
+    removeEdge (e: ED): void {
         const u = e.source as number;
         const v = e.target as number;
         const source = this._vertices[u];
@@ -1838,9 +1839,9 @@ export class RenderGraph implements impl.BidirectionalGraph
     }
     //-----------------------------------------------------------------
     // ReferenceGraph
-    // type reference_descriptor = impl.ED;
-    // type child_iterator = impl.OutEI;
-    // type parent_iterator = impl.InEI;
+    // type reference_descriptor = ED;
+    // type child_iterator = OutEI;
+    // type parent_iterator = InEI;
     reference (u: number, v: number): boolean {
         for (const oe of this._vertices[u]._children) {
             if (v === oe.target as number) {
@@ -1849,17 +1850,17 @@ export class RenderGraph implements impl.BidirectionalGraph
         }
         return false;
     }
-    parent (e: impl.ED): number {
+    parent (e: ED): number {
         return e.source as number;
     }
-    child (e: impl.ED): number {
+    child (e: ED): number {
         return e.target as number;
     }
-    parents (v: number): impl.InEI {
-        return new impl.InEI(this._vertices[v]._parents.values(), v);
+    parents (v: number): InEI {
+        return new InEI(this._vertices[v]._parents.values(), v);
     }
-    children (v: number): impl.OutEI {
-        return new impl.OutEI(this._vertices[v]._children.values(), v);
+    children (v: number): OutEI {
+        return new OutEI(this._vertices[v]._children.values(), v);
     }
     numParents (v: number): number {
         return this._vertices[v]._parents.length;
@@ -1902,13 +1903,13 @@ export class RenderGraph implements impl.BidirectionalGraph
     }
     //-----------------------------------------------------------------
     // MutableReferenceGraph
-    addReference (u: number, v: number): impl.ED | null {
+    addReference (u: number, v: number): ED | null {
         // update in/out edge list
-        this._vertices[u]._children.push(new impl.OutE(v));
-        this._vertices[v]._parents.push(new impl.OutE(u));
-        return new impl.ED(u, v);
+        this._vertices[u]._children.push(new OutE(v));
+        this._vertices[v]._parents.push(new OutE(u));
+        return new ED(u, v);
     }
-    removeReference (e: impl.ED): void {
+    removeReference (e: ED): void {
         const u = e.source as number;
         const v = e.target as number;
         const source = this._vertices[u];

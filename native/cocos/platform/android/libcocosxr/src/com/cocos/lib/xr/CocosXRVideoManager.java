@@ -164,7 +164,6 @@ public class CocosXRVideoManager {
                 @Override
                 public void onScriptEvent(String eventData) {
                     if(isPaused) {
-                        Log.e(TAG, "onScriptEvent failed, because is paused !!!");
                         return;
                     }
                     processVideoEvent(eventData);
@@ -219,12 +218,15 @@ public class CocosXRVideoManager {
     private void processVideoEvent(String eventData) {
         VideoEventData videoEventData = new VideoEventData(eventData);
         if (videoEventData.eventId == VIDEO_EVENT_PREPARE) {
-            if (!xrVideoPlayerHashMap.containsKey(videoEventData.videoPlayerHandleKey)) {
-                CocosXRVideoPlayer videoPlayer = new CocosXRVideoPlayer(activityWeakReference, videoEventData.videoPlayerHandleKey, videoEventData.eventName);
+            CocosXRVideoPlayer videoPlayer = xrVideoPlayerHashMap.get(videoEventData.videoPlayerHandleKey);
+            if (videoPlayer == null) {
+                videoPlayer = new CocosXRVideoPlayer(activityWeakReference, videoEventData.videoPlayerHandleKey, videoEventData.eventName);
+                videoPlayer.prepare(videoEventData);
                 xrVideoPlayerHashMap.put(videoEventData.videoPlayerHandleKey, videoPlayer);
+            } else {
+                videoPlayer.prepare(videoEventData);
             }
 
-            xrVideoPlayerHashMap.get(videoEventData.videoPlayerHandleKey).prepare(videoEventData);
             if (videoGLThread == null) {
                 videoGLThread = new CocosXRVideoGLThread();
                 videoGLThread.start();
@@ -390,6 +392,7 @@ public class CocosXRVideoManager {
             lastTickTime = System.nanoTime();
             Set<Map.Entry<String, CocosXRVideoPlayer>> entrySets = xrVideoPlayerHashMap.entrySet();
             for (Map.Entry<String, CocosXRVideoPlayer> entrySet : entrySets) {
+                entrySet.getValue().onBeforeGLDrawFrame();
                 if(entrySet.getValue().isStopped() || entrySet.getValue().getVideoTextureWidth() == 0 || entrySet.getValue().getVideoTextureHeight() == 0) {
                     continue;
                 }

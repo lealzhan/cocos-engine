@@ -1,19 +1,18 @@
 /* eslint-disable max-len */
 /****************************************************************************
- Copyright (c) 2021-2022 Xiamen Yaji Software Co., Ltd.
+ Copyright (c) 2021-2023 Xiamen Yaji Software Co., Ltd.
 
  http://www.cocos.com
 
  Permission is hereby granted, free of charge, to any person obtaining a copy
- of this software and associated engine source code (the "Software"), a limited,
- worldwide, royalty-free, non-assignable, revocable and non-exclusive license
- to use Cocos Creator solely to develop games on your target platforms. You shall
- not use Cocos Creator software for developing other software or tools that's
- used for developing games. You are not granted to publish, distribute,
- sublicense, and/or sell copies of Cocos Creator.
+ of this software and associated documentation files (the "Software"), to deal
+ in the Software without restriction, including without limitation the rights to
+ use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+ of the Software, and to permit persons to whom the Software is furnished to do so,
+ subject to the following conditions:
 
- The software or tools in this License Agreement are licensed, not sold.
- Xiamen Yaji Software Co., Ltd. reserves all rights not expressly granted to you.
+ The above copyright notice and this permission notice shall be included in
+ all copies or substantial portions of the Software.
 
  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -30,11 +29,7 @@ import { ShaderStageFlagBit, Type, Uniform, UniformBlock } from '../../gfx';
 import { Descriptor, DescriptorBlock, DescriptorBlockIndex, DescriptorTypeOrder, ParameterType, UpdateFrequency } from './types';
 import { JOINT_UNIFORM_CAPACITY, RenderPassStage, SetIndex, UBOCamera, UBOCSM, UBOForwardLight, UBOGlobal, UBOLocal, UBOLocalBatched, UBOMorph, UBOShadow, UBOSkinning, UBOSkinningAnimation, UBOSkinningTexture, UBOUILocal, UBOWorldBound } from '../define';
 import { DefaultVisitor, edge_descriptor } from './graph';
-import { _decorator } from '../../core';
 
-const { ccclass } = _decorator;
-
-@ccclass('cc.WebDescriptorHierarchy')
 export class WebDescriptorHierarchy {
     public uniformBlockIndex: Map<DescriptorBlock, DescriptorBlockIndex>;
     public blockMerged: Map<DescriptorBlock, Map<Type, Descriptor>>;
@@ -353,6 +348,8 @@ export class WebDescriptorHierarchy {
                     const v2add = this._layoutGraph.locate(`/${pName}/${phase}`);
                     if (v2add === 0xFFFFFFFF) {
                         const v = this.addRenderPhase(phase, parent);
+                        const renderPhase = this._layoutGraph.getRenderPhase(v);
+                        renderPhase.shaders.add(pass.program);
                         const dbStored = this._layoutGraph.getDescriptors(v);
                         for (const ee of db2add.blocks) {
                             const blockIndex = ee[0];

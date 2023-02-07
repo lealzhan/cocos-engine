@@ -1,19 +1,18 @@
 /*
  Copyright (c) 2013-2016 Chukong Technologies Inc.
- Copyright (c) 2017-2020 Xiamen Yaji Software Co., Ltd.
+ Copyright (c) 2017-2023 Xiamen Yaji Software Co., Ltd.
 
  http://www.cocos.com
 
  Permission is hereby granted, free of charge, to any person obtaining a copy
- of this software and associated engine source code (the "Software"), a limited,
-  worldwide, royalty-free, non-assignable, revocable and non-exclusive license
- to use Cocos Creator solely to develop games on your target platforms. You shall
-  not use Cocos Creator software for developing other software or tools that's
-  used for developing games. You are not granted to publish, distribute,
-  sublicense, and/or sell copies of Cocos Creator.
+ of this software and associated documentation files (the "Software"), to deal
+ in the Software without restriction, including without limitation the rights to
+ use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+ of the Software, and to permit persons to whom the Software is furnished to do so,
+ subject to the following conditions:
 
- The software or tools in this License Agreement are licensed, not sold.
- Xiamen Yaji Software Co., Ltd. reserves all rights not expressly granted to you.
+ The above copyright notice and this permission notice shall be included in
+ all copies or substantial portions of the Software.
 
  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -27,10 +26,12 @@
 import { EDITOR, TEST } from 'internal:constants';
 import { ccclass, type } from 'cc.decorator';
 import { TextureType, TextureInfo, TextureViewInfo } from '../../gfx';
-import { PixelFormat } from './asset-enum';
+import { Filter, PixelFormat } from './asset-enum';
 import { ImageAsset } from './image-asset';
 import { PresumedGFXTextureInfo, PresumedGFXTextureViewInfo, SimpleTexture } from './simple-texture';
 import { js, cclegacy } from '../../core';
+
+const compressedImageAsset: ImageAsset[] = [];
 
 /**
  * @en The create information for [[Texture2D]]
@@ -94,6 +95,40 @@ export class Texture2D extends SimpleTexture {
         return this._mipmaps;
     }
     set mipmaps (value) {
+        if (value.length > 0 && value[0].mipmapLevelDataSize && value[0].mipmapLevelDataSize.length > 0) {
+            compressedImageAsset.length = 0;
+            const mipmapLevelDataSize = value[0].mipmapLevelDataSize;
+            const data: Uint8Array = value[0].data as Uint8Array;
+            const _width = value[0].width;
+            const _height = value[0].height;
+            const _format = value[0].format;
+
+            let byteOffset = 0;
+            for (let i = 0; i < mipmapLevelDataSize.length; i++) {
+                // fixme: We can't use srcView, we must make an in-memory copy. The reason is unknown
+                const srcView = new Uint8Array(data.buffer, byteOffset, mipmapLevelDataSize[i]);
+                const dstView = new Uint8Array(mipmapLevelDataSize[i]);
+                dstView.set(srcView);
+                compressedImageAsset[i] = new ImageAsset({
+                    _data: dstView,
+                    _compressed: true,
+                    width: _width,
+                    height: _height,
+                    format: _format,
+                    mipmapLevelDataSize: [],
+                });
+
+                compressedImageAsset[i]._uuid = value[0]._uuid;
+                this.setMipFilter(Filter.LINEAR);
+                byteOffset += mipmapLevelDataSize[i];
+            }
+            this._setMipmapParams(compressedImageAsset);
+        } else {
+            this._setMipmapParams(value);
+        }
+    }
+
+    private _setMipmapParams (value: ImageAsset[]) {
         this._mipmaps = value;
         this._setMipmapLevel(this._mipmaps.length);
         if (this._mipmaps.length > 0) {

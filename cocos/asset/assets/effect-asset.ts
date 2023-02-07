@@ -1,18 +1,17 @@
 /*
- Copyright (c) 2017-2020 Xiamen Yaji Software Co., Ltd.
+ Copyright (c) 2017-2023 Xiamen Yaji Software Co., Ltd.
 
  https://www.cocos.com/
 
  Permission is hereby granted, free of charge, to any person obtaining a copy
- of this software and associated engine source code (the "Software"), a limited,
-  worldwide, royalty-free, non-assignable, revocable and non-exclusive license
- to use Cocos Creator solely to develop games on your target platforms. You shall
-  not use Cocos Creator software for developing other software or tools that's
-  used for developing games. You are not granted to publish, distribute,
-  sublicense, and/or sell copies of Cocos Creator.
+ of this software and associated documentation files (the "Software"), to deal
+ in the Software without restriction, including without limitation the rights to
+ use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+ of the Software, and to permit persons to whom the Software is furnished to do so,
+ subject to the following conditions:
 
- The software or tools in this License Agreement are licensed, not sold.
- Xiamen Yaji Software Co., Ltd. reserves all rights not expressly granted to you.
+ The above copyright notice and this permission notice shall be included in
+ all copies or substantial portions of the Software.
 
  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -33,6 +32,8 @@ import { MacroRecord } from '../../render-scene/core/pass-utils';
 import { programLib } from '../../render-scene/core/program-lib';
 import { Asset } from './asset';
 import { cclegacy, warnID } from '../../core';
+import { ProgramLibrary } from '../../rendering/custom/private';
+import { addEffectDefaultProperties, getCombinationDefines } from '../../render-scene/core/program-utils';
 
 export declare namespace EffectAsset {
     export interface IPropertyInfo {
@@ -52,6 +53,7 @@ export declare namespace EffectAsset {
         blendState?: BlendState;
         dynamicStates?: DynamicStateFlags;
         phase?: string | number;
+        pass?: string;
     }
     export interface IPassInfo extends IPassStates {
         program: string; // auto-generated from 'vert' and 'frag'
@@ -143,6 +145,16 @@ export declare namespace EffectAsset {
         samplerTextures: IBuiltin[];
         images: IBuiltin[];
     }
+    export interface IDescriptorInfo {
+        rate: number;
+        blocks: IBlockInfo[];
+        samplerTextures: ISamplerTextureInfo[];
+        samplers: ISamplerInfo[];
+        textures: ITextureInfo[];
+        buffers: IBufferInfo[];
+        images: IImageInfo[];
+        subpassInputs: IInputAttachmentInfo[];
+    }
     export interface IShaderInfo {
         name: string;
         hash: number;
@@ -159,6 +171,7 @@ export declare namespace EffectAsset {
         buffers: IBufferInfo[];
         images: IImageInfo[];
         subpassInputs: IInputAttachmentInfo[];
+        descriptors: IDescriptorInfo[];
     }
     export interface IPreCompileInfo {
         [name: string]: boolean[] | number[] | string[];
@@ -287,26 +300,29 @@ export class EffectAsset extends Asset {
      * @zh 通过 [[CCLoader]] 加载完成时的回调，将自动注册 effect 资源。
      */
     public onLoaded () {
-        programLib.register(this);
+        if (cclegacy.rendering && cclegacy.rendering.enableEffectImport) {
+            addEffectDefaultProperties(this);
+            (cclegacy.rendering.programLib as ProgramLibrary).addEffect(this);
+        } else {
+            programLib.register(this);
+        }
         EffectAsset.register(this);
         if (!EDITOR || cclegacy.GAME_VIEW) { cclegacy.game.once(cclegacy.Game.EVENT_RENDERER_INITED, this._precompile, this); }
     }
 
     protected _precompile () {
+        if (cclegacy.rendering && cclegacy.rendering.enableEffectImport) {
+            (cclegacy.rendering.programLib as ProgramLibrary).precompileEffect(deviceManager.gfxDevice, this);
+            return;
+        }
         const root = cclegacy.director.root as Root;
         for (let i = 0; i < this.shaders.length; i++) {
             const shader = this.shaders[i];
             const combination = this.combinations[i];
-            if (!combination) { continue; }
-            const defines = Object.keys(combination).reduce((out, name) => out.reduce((acc, cur) => {
-                const choices = combination[name];
-                for (let i = 0; i < choices.length; ++i) {
-                    const defines = { ...cur };
-                    defines[name] = choices[i];
-                    acc.push(defines);
-                }
-                return acc;
-            }, [] as MacroRecord[]), [{}] as MacroRecord[]);
+            if (!combination) {
+                continue;
+            }
+            const defines = getCombinationDefines(combination);
             defines.forEach(
                 (defines) => programLib.getGFXShader(deviceManager.gfxDevice, shader.name, defines, root.pipeline),
             );

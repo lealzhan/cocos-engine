@@ -1,18 +1,17 @@
 /*
- Copyright (c) 2020 Xiamen Yaji Software Co., Ltd.
+ Copyright (c) 2020-2023 Xiamen Yaji Software Co., Ltd.
 
  https://www.cocos.com/
 
  Permission is hereby granted, free of charge, to any person obtaining a copy
- of this software and associated engine source code (the "Software"), a limited,
- worldwide, royalty-free, non-assignable, revocable and non-exclusive license
- to use Cocos Creator solely to develop games on your target platforms. You shall
- not use Cocos Creator software for developing other software or tools that's
- used for developing games. You are not granted to publish, distribute,
- sublicense, and/or sell copies of Cocos Creator.
+ of this software and associated documentation files (the "Software"), to deal
+ in the Software without restriction, including without limitation the rights to
+ use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+ of the Software, and to permit persons to whom the Software is furnished to do so,
+ subject to the following conditions:
 
- The software or tools in this License Agreement are licensed, not sold.
- Xiamen Yaji Software Co., Ltd. reserves all rights not expressly granted to you.
+ The above copyright notice and this permission notice shall be included in
+ all copies or substantial portions of the Software.
 
  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -21,7 +20,7 @@
  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  THE SOFTWARE.
- */
+*/
 
 import { ccclass, tooltip, displayOrder, type, serializable, range } from 'cc.decorator';
 import { Material } from '../../asset/assets/material';
@@ -213,7 +212,7 @@ export default class TrailModule {
      */
     @type(CurveRange)
     @serializable
-    @range([0, 1])
+    @range([0, Number.POSITIVE_INFINITY])
     @displayOrder(3)
     @tooltip('i18n:trailSegment.lifeTime')
     public lifeTime = new CurveRange();
@@ -278,7 +277,7 @@ export default class TrailModule {
      */
     @type(CurveRange)
     @serializable
-    @range([0, 1])
+    @range([0, Number.POSITIVE_INFINITY])
     @displayOrder(10)
     @tooltip('i18n:trailSegment.widthRatio')
     public widthRatio = new CurveRange();
@@ -336,6 +335,7 @@ export default class TrailModule {
     private _iBuffer: Uint16Array | null = null;
     private _needTransform = false;
     private _material: Material | null = null;
+    private _inited: boolean;
 
     constructor () {
         this._iaInfo = new IndirectBuffer([new DrawInfo()]);
@@ -353,6 +353,8 @@ export default class TrailModule {
         }
 
         this._particleTrail = new Map<Particle, TrailSegment>();
+
+        this._inited = false;
     }
 
     public onInit (ps) {
@@ -374,6 +376,7 @@ export default class TrailModule {
         if (this._enable) {
             this.enable = this._enable;
         }
+        this._inited = true;
     }
 
     public onEnable () {

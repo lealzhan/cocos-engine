@@ -39,6 +39,7 @@
 //
 
 %ignore UserData;
+%ignore cc::RefCounted;
 
 %ignore cc::UIMeshBuffer::requireFreeIA;
 %ignore cc::UIMeshBuffer::createNewIA;
@@ -155,6 +156,7 @@
 %attribute(cc::RenderDrawInfo, uint8_t, stride, getStride, setStride);
 
 %attribute(cc::RenderEntity, cc::Node*, node, getNode, setNode);
+%attribute(cc::RenderEntity, cc::Node*, renderTransform, getRenderTransform, setRenderTransform);
 %attribute(cc::RenderEntity, uint32_t, staticDrawInfoSize, getStaticDrawInfoSize, setStaticDrawInfoSize);
 %attribute(cc::RenderEntity, uint32_t, stencilStage, getStencilStage, setStencilStage);
 
@@ -164,6 +166,7 @@
 //   %import "your_header_file.h" will not generate code for that header file
 //
 %import "base/Macros.h"
+%import "base/RefCounted.h"
 %import "base/TypeDef.h"
 %import "base/Ptr.h"
 %import "base/memory/Memory.h"

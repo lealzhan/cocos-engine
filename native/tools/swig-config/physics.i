@@ -16,6 +16,8 @@
 // Insert code at the beginning of generated source file (.cpp)
 %{
 #include "bindings/auto/jsb_physics_auto.h"
+#include "bindings/auto/jsb_cocos_auto.h"
+#include "bindings/auto/jsb_geometry_auto.h"
 %}
 
 // ----- Ignore Section ------
@@ -31,6 +33,7 @@
 //  1. 'Ignore Section' should be placed before attribute definition and %import/%include
 //  2. namespace is needed
 //
+%ignore cc::RefCounted;
 
 %rename("$ignore", regextarget=1, fullname=1) "cc::physics::I[A-Za-z0-9]*(?:Body|World|Shape|Joint|Lifecycle)$";
 
@@ -83,6 +86,8 @@
 //   %import "your_header_file.h" will not generate code for that header file
 //
 %import "base/Macros.h"
+%import "base/RefCounted.h"
+
 %import "core/event/Event.h"
 %import "core/scene-graph/Node.h"
 

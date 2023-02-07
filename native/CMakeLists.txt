@@ -30,6 +30,10 @@ cc_set_if_undefined(USE_PHYSICS_PHYSX        OFF)
 cc_set_if_undefined(USE_MODULES              OFF)
 cc_set_if_undefined(USE_XR                   OFF)
 cc_set_if_undefined(USE_SERVER_MODE          OFF)
+cc_set_if_undefined(USE_AR_MODULE            OFF)
+cc_set_if_undefined(USE_AR_AUTO              OFF)
+cc_set_if_undefined(USE_AR_CORE              OFF)
+cc_set_if_undefined(USE_AR_ENGINE            OFF)
 cc_set_if_undefined(USE_PLUGINS              ON)
 cc_set_if_undefined(USE_OCCLUSION_QUERY      ON)
 cc_set_if_undefined(USE_DEBUG_RENDERER       ON)
@@ -206,6 +210,10 @@ cc_inspect_values(
     USE_JOB_SYSTEM_TASKFLOW
     USE_XR
     USE_SERVER_MODE
+    USE_AR_MODULE
+    USE_AR_AUTO
+    USE_AR_CORE
+    USE_AR_ENGINE
     USE_CCACHE
     CCACHE_EXECUTABLE
     NODE_EXECUTABLE
@@ -405,6 +413,8 @@ cocos_source_files(
     cocos/base/Agent.h
     cocos/base/astc.cpp
     cocos/base/astc.h
+    cocos/base/Compressed.h
+    cocos/base/Compressed.cpp
     cocos/base/base64.cpp
     cocos/base/base64.h
     cocos/base/Config.h
@@ -419,6 +429,7 @@ cocos_source_files(
     cocos/base/IndexHandle.h
     cocos/base/Locked.h
     cocos/base/Macros.h
+    cocos/base/Assertf.h
     cocos/base/Object.h
     cocos/base/Ptr.h
     cocos/base/Random.h
@@ -433,6 +444,7 @@ cocos_source_files(
     cocos/base/StringPool.h
     cocos/base/StringUtil.cpp
     cocos/base/StringUtil.h
+    cocos/base/TemplateUtils.h
     cocos/base/ThreadPool.cpp
     cocos/base/ThreadPool.h
     cocos/base/TypeDef.h
@@ -488,6 +500,9 @@ cocos_source_files(
     cocos/gi/light-probe/PolynomialSolver.h
     cocos/gi/light-probe/SH.cpp
     cocos/gi/light-probe/SH.h
+    cocos/gi/light-probe/tetgen.cpp
+    cocos/gi/light-probe/tetgen.h
+    cocos/gi/light-probe/predicates.cpp
 )
 
 ############ main
@@ -1073,6 +1088,8 @@ cocos_source_files(
                  cocos/renderer/core/PassUtils.cpp
                  cocos/renderer/core/ProgramLib.h
                  cocos/renderer/core/ProgramLib.cpp
+                 cocos/renderer/core/ProgramUtils.h
+                 cocos/renderer/core/ProgramUtils.cpp
                  cocos/renderer/core/MaterialInstance.h
                  cocos/renderer/core/MaterialInstance.cpp
                  cocos/renderer/core/PassInstance.h
@@ -1234,8 +1251,6 @@ cocos_source_files(
                  cocos/renderer/pipeline/Define.cpp
                  cocos/renderer/pipeline/GlobalDescriptorSetManager.h
                  cocos/renderer/pipeline/GlobalDescriptorSetManager.cpp
-                 cocos/renderer/pipeline/LODModelsUtil.cpp
-                 cocos/renderer/pipeline/LODModelsUtil.h
                  cocos/renderer/pipeline/InstancedBuffer.cpp
                  cocos/renderer/pipeline/InstancedBuffer.h
                  cocos/renderer/pipeline/PipelineStateManager.cpp
@@ -1299,10 +1314,16 @@ cocos_source_files(
                  cocos/renderer/pipeline/helper/Utils.cpp
                  cocos/renderer/pipeline/custom/BinaryArchive.h
                  cocos/renderer/pipeline/custom/FrameGraphDispatcher.cpp
-                 cocos/renderer/pipeline/custom/SerializationUtils.h
+                 cocos/renderer/pipeline/custom/details/SerializationUtils.h
                  cocos/renderer/pipeline/custom/test/test.h
                  cocos/renderer/pipeline/custom/NativeDefaultScene.cpp
                  cocos/renderer/pipeline/custom/NativeResourceGraph.cpp
+                 cocos/renderer/pipeline/reflection-probe/ReflectionProbeFlow.cpp
+                 cocos/renderer/pipeline/reflection-probe/ReflectionProbeFlow.h
+                 cocos/renderer/pipeline/reflection-probe/ReflectionProbeStage.cpp
+                 cocos/renderer/pipeline/reflection-probe/ReflectionProbeStage.h
+                 cocos/renderer/pipeline/ReflectionProbeBatchedQueue.cpp
+                 cocos/renderer/pipeline/ReflectionProbeBatchedQueue.h
                  cocos/renderer/pipeline/custom/ArchiveFwd.h
                  cocos/renderer/pipeline/custom/ArchiveTypes.cpp
                  cocos/renderer/pipeline/custom/ArchiveTypes.h
@@ -1311,51 +1332,44 @@ cocos_source_files(
                  cocos/renderer/pipeline/custom/FGDispatcherTypes.h
                  cocos/renderer/pipeline/custom/LayoutGraphFwd.h
                  cocos/renderer/pipeline/custom/LayoutGraphGraphs.h
-                 cocos/renderer/pipeline/custom/LayoutGraphJsb.cpp
-                 cocos/renderer/pipeline/custom/LayoutGraphJsb.h
                  cocos/renderer/pipeline/custom/LayoutGraphNames.h
-                 cocos/renderer/pipeline/custom/LayoutGraphReflection.cpp
-                 cocos/renderer/pipeline/custom/LayoutGraphReflection.h
                  cocos/renderer/pipeline/custom/LayoutGraphSerialization.h
                  cocos/renderer/pipeline/custom/LayoutGraphTypes.cpp
                  cocos/renderer/pipeline/custom/LayoutGraphTypes.h
+                 cocos/renderer/pipeline/custom/LayoutGraphUtils.cpp
+                 cocos/renderer/pipeline/custom/LayoutGraphUtils.h
                  cocos/renderer/pipeline/custom/NativeExecutor.cpp
-                 cocos/renderer/pipeline/custom/NativeLayoutGraphImpl.cpp
+                 cocos/renderer/pipeline/custom/NativeFactory.cpp
+                 cocos/renderer/pipeline/custom/NativeFwd.h
+                 cocos/renderer/pipeline/custom/NativeLayoutGraph.cpp
+                 cocos/renderer/pipeline/custom/NativePipeline.cpp
                  cocos/renderer/pipeline/custom/NativePipelineFwd.h
                  cocos/renderer/pipeline/custom/NativePipelineGraphs.h
-                 cocos/renderer/pipeline/custom/NativePipelineImpl.cpp
                  cocos/renderer/pipeline/custom/NativePipelineTypes.cpp
                  cocos/renderer/pipeline/custom/NativePipelineTypes.h
+                 cocos/renderer/pipeline/custom/NativeProgramLibrary.cpp
                  cocos/renderer/pipeline/custom/NativeRenderGraph.cpp
                  cocos/renderer/pipeline/custom/NativeRenderQueue.cpp
+                 cocos/renderer/pipeline/custom/NativeRenderingModule.cpp
+                 cocos/renderer/pipeline/custom/NativeTypes.cpp
+                 cocos/renderer/pipeline/custom/NativeTypes.h
+                 cocos/renderer/pipeline/custom/PrivateFwd.h
+                 cocos/renderer/pipeline/custom/PrivateTypes.cpp
+                 cocos/renderer/pipeline/custom/PrivateTypes.h
                  cocos/renderer/pipeline/custom/RenderCommonFwd.h
                  cocos/renderer/pipeline/custom/RenderCommonJsb.cpp
                  cocos/renderer/pipeline/custom/RenderCommonJsb.h
                  cocos/renderer/pipeline/custom/RenderCommonNames.h
-                 cocos/renderer/pipeline/custom/RenderCommonReflection.cpp
-                 cocos/renderer/pipeline/custom/RenderCommonReflection.h
                  cocos/renderer/pipeline/custom/RenderCommonSerialization.h
                  cocos/renderer/pipeline/custom/RenderCommonTypes.cpp
                  cocos/renderer/pipeline/custom/RenderCommonTypes.h
                  cocos/renderer/pipeline/custom/RenderGraphFwd.h
                  cocos/renderer/pipeline/custom/RenderGraphGraphs.h
-                 cocos/renderer/pipeline/custom/RenderGraphJsb.cpp
-                 cocos/renderer/pipeline/custom/RenderGraphJsb.h
-                 cocos/renderer/pipeline/custom/RenderGraphNames.h
-                 cocos/renderer/pipeline/custom/RenderGraphReflection.cpp
-                 cocos/renderer/pipeline/custom/RenderGraphReflection.h
                  cocos/renderer/pipeline/custom/RenderGraphTypes.cpp
                  cocos/renderer/pipeline/custom/RenderGraphTypes.h
                  cocos/renderer/pipeline/custom/RenderInterfaceFwd.h
-                 cocos/renderer/pipeline/custom/RenderInterfaceImpl.cpp
                  cocos/renderer/pipeline/custom/RenderInterfaceTypes.cpp
                  cocos/renderer/pipeline/custom/RenderInterfaceTypes.h
-                 cocos/renderer/pipeline/reflection-probe/ReflectionProbeFlow.cpp
-                 cocos/renderer/pipeline/reflection-probe/ReflectionProbeFlow.h
-                 cocos/renderer/pipeline/reflection-probe/ReflectionProbeStage.cpp
-                 cocos/renderer/pipeline/reflection-probe/ReflectionProbeStage.h
-                 cocos/renderer/pipeline/ReflectionProbeBatchedQueue.cpp
-                 cocos/renderer/pipeline/ReflectionProbeBatchedQueue.h
 )
 
 if (USE_GEOMETRY_RENDERER)
@@ -2448,12 +2462,21 @@ if(USE_MIDDLEWARE)
     endif()
 endif()
 
+if(USE_AR_MODULE)
+    cocos_source_files(
+            cocos/bindings/auto/jsb_ar_auto.cpp
+            cocos/bindings/auto/jsb_ar_auto.h
+    )
+endif()
+
 ######## manual
 cocos_source_files(
             cocos/bindings/manual/jsb_classtype.cpp
             cocos/bindings/manual/jsb_classtype.h
             cocos/bindings/manual/jsb_cocos_manual.cpp
             cocos/bindings/manual/jsb_cocos_manual.h
+            cocos/bindings/manual/jsb_geometry_manual.cpp
+            cocos/bindings/manual/jsb_geometry_manual.h
             cocos/bindings/manual/jsb_conversions.h
             cocos/bindings/manual/jsb_conversions_spec.cpp
             cocos/bindings/manual/jsb_conversions_spec.h
@@ -2528,6 +2551,13 @@ elseif(WIN32)
 elseif(LINUX)
     cocos_source_files(
         NO_WERROR    cocos/bindings/manual/jsb_platform_linux.cpp
+    )
+endif()
+
+if(USE_AR_MODULE)
+    cocos_source_files(
+                     cocos/bindings/manual/jsb_ar_manual.cpp
+                     cocos/bindings/manual/jsb_ar_manual.h
     )
 endif()
 
@@ -2742,6 +2772,24 @@ elseif(LINUX OR QNX)
     endif()
 endif()
 
+##### ar module
+if(USE_AR_MODULE)
+    cocos_source_files(
+        cocos/xr/ar/ARModule.cpp
+        cocos/xr/ar/ARModule.h
+        cocos/xr/ar/IARAPI.h
+        cocos/renderer/pipeline/xr/ar/ARStage.cpp
+        cocos/renderer/pipeline/xr/ar/ARStage.h
+        cocos/renderer/pipeline/xr/ar/ARBackground.cpp
+        cocos/renderer/pipeline/xr/ar/ARBackground.h
+    )
+    if(ANDROID OR IOS)
+        cocos_source_files(
+            cocos/xr/ar/ARLib.h
+        )
+    endif()
+endif()
+
 ##### extensions
 
 cocos_source_files(
@@ -2937,6 +2985,10 @@ function(cc_apply_definations target)
         $<IF:$<BOOL:${USE_JOB_SYSTEM_TBB}>,CC_USE_JOB_SYSTEM_TBB=1,CC_USE_JOB_SYSTEM_TBB=0>
         $<IF:$<BOOL:${USE_JOB_SYSTEM_TASKFLOW}>,CC_USE_JOB_SYSTEM_TASKFLOW=1,CC_USE_JOB_SYSTEM_TASKFLOW=0>
         $<IF:$<BOOL:${USE_PHYSICS_PHYSX}>,CC_USE_PHYSICS_PHYSX=1,CC_USE_PHYSICS_PHYSX=0>
+        $<IF:$<BOOL:${USE_AR_MODULE}>,CC_USE_AR_MODULE=1,CC_USE_AR_MODULE=0>
+        $<IF:$<BOOL:${USE_AR_AUTO}>,CC_USE_AR_AUTO=1,CC_USE_AR_AUTO=0>
+        $<IF:$<BOOL:${USE_AR_CORE}>,CC_USE_AR_CORE=1,CC_USE_AR_CORE=0>
+        $<IF:$<BOOL:${USE_AR_ENGINE}>,CC_USE_AR_ENGINE=1,CC_USE_AR_ENGINE=0>
         $<IF:$<BOOL:${USE_OCCLUSION_QUERY}>,CC_USE_OCCLUSION_QUERY=1,CC_USE_OCCLUSION_QUERY=0>
         $<IF:$<BOOL:${USE_DEBUG_RENDERER}>,CC_USE_DEBUG_RENDERER=1,CC_USE_DEBUG_RENDERER=0>
         $<IF:$<BOOL:${USE_GEOMETRY_RENDERER}>,CC_USE_GEOMETRY_RENDERER=1,CC_USE_GEOMETRY_RENDERER=0>
@@ -2987,12 +3039,14 @@ if(MSVC)
     target_compile_options(${ENGINE_NAME} PUBLIC /MP
         /bigobj
         /wd4018 # signed/unsigned mismatch
+        /wd4221 # no public symbols
         /wd4244 # type conversion data lost
         /wd4267 # conversion from 'size_t' to 'type', possible loss of data
         /wd4305 # truncation from 'type1' to 'type2'
         /wd4309 # truncation of constant value
         /wd4819 # file contains a character that cannot be represented in the current code page
         /wd4996 # deprecated
+        /wd4098 # defaultlib conflicts
         /wd4099 # PDB 'filename' was not found with 'object/library' or at 'path'; linking object as if no debug info
     )
 endif()

@@ -1,19 +1,18 @@
 /*
  Copyright (c) 2013-2016 Chukong Technologies Inc.
- Copyright (c) 2017-2020 Xiamen Yaji Software Co., Ltd.
+ Copyright (c) 2017-2023 Xiamen Yaji Software Co., Ltd.
 
  http://www.cocos.com
 
  Permission is hereby granted, free of charge, to any person obtaining a copy
- of this software and associated engine source code (the "Software"), a limited,
-  worldwide, royalty-free, non-assignable, revocable and non-exclusive license
- to use Cocos Creator solely to develop games on your target platforms. You shall
-  not use Cocos Creator software for developing other software or tools that's
-  used for developing games. You are not granted to publish, distribute,
-  sublicense, and/or sell copies of Cocos Creator.
+ of this software and associated documentation files (the "Software"), to deal
+ in the Software without restriction, including without limitation the rights to
+ use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+ of the Software, and to permit persons to whom the Software is furnished to do so,
+ subject to the following conditions:
 
- The software or tools in this License Agreement are licensed, not sold.
- Xiamen Yaji Software Co., Ltd. reserves all rights not expressly granted to you.
+ The above copyright notice and this permission notice shall be included in
+ all copies or substantial portions of the Software.
 
  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -24,7 +23,7 @@
  THE SOFTWARE.
 */
 
-import { DEBUG, EDITOR, NATIVE, PREVIEW, TEST } from 'internal:constants';
+import { BUILD, DEBUG, EDITOR, HTML5, JSB, NATIVE, PREVIEW, RUNTIME_BASED, TEST, WEBGPU, TAOBAO } from 'internal:constants';
 import { systemInfo } from 'pal/system-info';
 import { findCanvas, loadJsFile } from 'pal/env';
 import { Pacer } from 'pal/pacer';
@@ -42,7 +41,7 @@ import { bindingMappingInfo } from '../rendering/define';
 import { IBundleOptions } from '../asset/asset-manager/shared';
 import { ICustomJointTextureLayout } from '../3d/skeletal-animation/skeletal-animation-utils';
 import { IPhysicsConfig } from '../physics/framework/physics-config';
-
+import { effectSettings } from '../core/effect-settings';
 /**
  * @zh
  * 游戏配置。
@@ -57,6 +56,14 @@ export interface IGameConfig {
      * The path of settings.json
      */
     settingsPath?: string;
+
+    /**
+     * @zh
+     * 引擎内 Effect 配置文件路径
+     * @en
+     * The path of effectSettings.json
+     */
+    effectSettingsPath?: string;
 
     /**
      * @zh
@@ -184,10 +191,9 @@ export class Game extends EventTarget {
      * 在原生平台，它对应的是应用被切换到后台事件，下拉菜单和上拉状态栏等不一定会触发这个事件，这取决于系统行为。
      * @example
      * ```ts
-     * import { game, audioEngine } from 'cc';
+     * import { game } from 'cc';
      * game.on(Game.EVENT_HIDE, function () {
-     *     audioEngine.pauseMusic();
-     *     audioEngine.pauseAllEffects();
+     *
      * });
      * ```
      */
@@ -281,6 +287,25 @@ export class Game extends EventTarget {
      * @zh 调用restart后，触发事件
      */
     public static readonly EVENT_RESTART = 'game_on_restart';
+
+    /**
+     * @en Triggered when the game is paused.<br>
+     * @zh 游戏暂停时触发该事件。<br>
+     * @example
+     * ```ts
+     * import { game } from 'cc';
+     * game.on(Game.EVENT_PAUSE, function () {
+     *     //pause audio or video
+     * });
+     * ```
+     */
+    public static readonly EVENT_PAUSE = 'game_on_pause';
+
+    /**
+     * @en Triggered when the game is resumed.<br>
+     * @zh 游戏恢复时触发该事件。<br>
+     */
+    public static readonly EVENT_RESUME = 'game_on_resume';
 
     /**
      * @en Web Canvas 2d API as renderer backend.
@@ -550,6 +575,7 @@ export class Game extends EventTarget {
         if (this._paused) { return; }
         this._paused = true;
         this._pacer?.stop();
+        this.emit(Game.EVENT_PAUSE);
     }
 
     /**
@@ -563,6 +589,7 @@ export class Game extends EventTarget {
         input._clearEvents();
         this._paused = false;
         this._pacer?.start();
+        this.emit(Game.EVENT_RESUME);
     }
 
     /**
@@ -743,6 +770,19 @@ export class Game extends EventTarget {
                 this.emit(Game.EVENT_PRE_SUBSYSTEM_INIT);
                 return this.onPreSubsystemInitDelegate.dispatch();
             })
+            .then(() => effectSettings.init(config.effectSettingsPath))
+            .then(() => {
+                // initialize custom render pipeline
+                if (!cclegacy.rendering || !cclegacy.rendering.enableEffectImport) {
+                    return;
+                }
+                const data = effectSettings.data;
+                if (data === null) {
+                    console.error('Effect settings not found, effects will not be imported.');
+                    return;
+                }
+                cclegacy.rendering.init(deviceManager.gfxDevice, data);
+            })
             .then(() => {
                 if (DEBUG) {
                     console.time('Init SubSystem');
@@ -758,7 +798,7 @@ export class Game extends EventTarget {
                 return this.onPostSubsystemInitDelegate.dispatch();
             })
             .then(() => {
-                log(`Cocos Creator v${VERSION}`);
+                console.log(`Cocos Creator v${VERSION}`);
                 this.emit(Game.EVENT_ENGINE_INITED);
                 this._engineInited = true;
             })
@@ -812,12 +852,11 @@ export class Game extends EventTarget {
     }
 
     private _initXR () {
-        globalThis.__globalXR = {};
+        if (typeof globalThis.__globalXR === 'undefined') {
+            globalThis.__globalXR = {};
+        }
         const globalXR = globalThis.__globalXR;
-        // xrEnv 0 NONE 1 XR 2 WEB_XR
-        globalXR.xrEnv = settings.querySettings(Settings.Category.XR, 'xrEnv') ?? 0;
-        // xrType 0 NONE 1 VR 2 AR
-        globalXR.xrType = settings.querySettings(Settings.Category.XR, 'xrType') ?? 0;
+        globalXR.webxrCompatible = settings.querySettings(Settings.Category.XR, 'webxrCompatible') ?? false;
 
         if (sys.isXR) {
             // XrEntry must not be destroyed

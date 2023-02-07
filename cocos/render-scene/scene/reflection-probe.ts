@@ -1,18 +1,17 @@
 /*
- Copyright (c) 2020 Xiamen Yaji Software Co., Ltd.
+ Copyright (c) 2020-2023 Xiamen Yaji Software Co., Ltd.
 
  https://www.cocos.com/
 
  Permission is hereby granted, free of charge, to any person obtaining a copy
- of this software and associated engine source code (the "Software"), a limited,
- worldwide, royalty-free, non-assignable, revocable and non-exclusive license
- to use Cocos Creator solely to develop games on your target platforms. You shall
- not use Cocos Creator software for developing other software or tools that's
- used for developing games. You are not granted to publish, distribute,
- sublicense, and/or sell copies of Cocos Creator.
+ of this software and associated documentation files (the "Software"), to deal
+ in the Software without restriction, including without limitation the rights to
+ use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+ of the Software, and to permit persons to whom the Software is furnished to do so,
+ subject to the following conditions:
 
- The software or tools in this License Agreement are licensed, not sold.
- Xiamen Yaji Software Co., Ltd. reserves all rights not expressly granted to you.
+ The above copyright notice and this permission notice shall be included in
+ all copies or substantial portions of the Software.
 
  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -21,13 +20,13 @@
  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  THE SOFTWARE.
- */
+*/
 import { EDITOR } from 'internal:constants';
 import { Camera, CameraAperture, CameraFOVAxis, CameraISO, CameraProjection, CameraShutter, CameraType, SKYBOX_FLAG, TrackingType } from './camera';
 import { Node } from '../../scene-graph/node';
-import { Color, Quat, Rect, toRadian, Vec2, Vec3, geometry, cclegacy } from '../../core';
+import { Color, Quat, Rect, toRadian, Vec2, Vec3, geometry, cclegacy, Vec4 } from '../../core';
 import { CAMERA_DEFAULT_MASK } from '../../rendering/define';
-import { ClearFlagBit } from '../../gfx';
+import { ClearFlagBit, Framebuffer } from '../../gfx';
 import { TextureCube } from '../../asset/assets/texture-cube';
 import { RenderTexture } from '../../asset/assets/render-texture';
 
@@ -58,7 +57,7 @@ export class ReflectionProbe {
     public realtimePlanarTexture: RenderTexture | null = null;
 
     protected _resolution = 512;
-    protected _clearFlag:number = ProbeClearFlag.SKYBOX;
+    protected _clearFlag: number = ProbeClearFlag.SKYBOX;
     protected _backgroundColor = new Color(0, 0, 0, 255);
     protected _visibility = CAMERA_DEFAULT_MASK;
     protected _probeType = ProbeType.CUBE;
@@ -113,6 +112,14 @@ export class ReflectionProbe {
      * @zh 世界空间相机朝上的方向向量
      */
     private _up = new Vec3();
+
+    /**
+     * @en Reflection probe cube pattern preview sphere
+     * @zh 反射探针cube模式的预览小球
+     */
+    protected _previewSphere: Node | null = null;
+
+    protected _previewPlane: Node | null = null;
 
     /**
      * @en Set probe type,cube or planar.
@@ -191,7 +198,7 @@ export class ReflectionProbe {
         return this._size;
     }
 
-    set cubemap (val: TextureCube) {
+    set cubemap (val: TextureCube | null) {
         this._cubemap = val;
     }
 
@@ -234,18 +241,43 @@ export class ReflectionProbe {
         return this._boundingBox;
     }
 
-    set cameraNode (node:Node) {
+    set cameraNode (node: Node) {
         this._cameraNode = node;
     }
     get cameraNode () {
         return this._cameraNode!;
     }
 
+    /**
+     * @en Reflection probe cube mode preview sphere
+     * @zh 反射探针cube模式的预览小球
+     * @engineInternal
+     */
+    set previewSphere (val: Node) {
+        this._previewSphere = val;
+    }
+
+    get previewSphere () {
+        return this._previewSphere!;
+    }
+
+    /**
+     * @en Reflection probe planar mode preview plane
+     * @zh 反射探针Planar模式的预览平面
+     */
+    set previewPlane (val: Node) {
+        this._previewPlane = val;
+    }
+
+    get previewPlane () {
+        return this._previewPlane!;
+    }
+
     constructor (id: number) {
         this._probeId = id;
     }
 
-    public initialize (node: Node, cameraNode:Node) {
+    public initialize (node: Node, cameraNode: Node) {
         this._node = node;
         this._cameraNode = cameraNode;
         const pos = this.node.getWorldPosition();
@@ -278,16 +310,17 @@ export class ReflectionProbe {
         if (!this.realtimePlanarTexture) {
             const canvasSize = cclegacy.view.getDesignResolutionSize();
             this.realtimePlanarTexture = this._createTargetTexture(canvasSize.width, canvasSize.height);
+            cclegacy.internal.reflectionProbeManager.updatePlanarMap(this, this.realtimePlanarTexture.getGFXTexture());
         }
         this._syncCameraParams(sourceCamera);
         this._transformReflectionCamera(sourceCamera);
         this._needRender = true;
     }
 
-    public switchProbeType (type: number, sourceCamera?: Camera) {
+    public switchProbeType (type: number, sourceCamera: Camera | null) {
         if (type === ProbeType.CUBE) {
             this._needRender = false;
-        } else if (sourceCamera !== undefined) {
+        } else if (sourceCamera !== null) {
             this.renderPlanarReflection(sourceCamera);
         }
     }
@@ -327,13 +360,36 @@ export class ReflectionProbe {
             this.realtimePlanarTexture = null;
         }
     }
+    public enable () {
+    }
+    public disable () {
+    }
 
     public updateCameraDir (faceIdx: number) {
         this.cameraNode.setRotationFromEuler(cameraDir[faceIdx]);
         this.camera.update(true);
     }
 
-    public _syncCameraParams (camera: Camera) {
+    public updateBoundingBox () {
+        if (this.node) {
+            this.node.updateWorldTransform();
+            const pos = this.node.getWorldPosition();
+            geometry.AABB.set(this._boundingBox!, pos.x, pos.y, pos.z, this._size.x, this._size.y, this._size.z);
+        }
+    }
+
+    public hasFrameBuffer (framebuffer: Framebuffer) {
+        if (this.bakedCubeTextures.length === 0) return false;
+        for (let i = 0; i < this.bakedCubeTextures.length; i++) {
+            const rt = this.bakedCubeTextures[i];
+            if (rt.window?.framebuffer === framebuffer) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private _syncCameraParams (camera: Camera) {
         this.camera.projectionType = camera.projectionType;
         this.camera.orthoHeight = camera.orthoHeight;
         this.camera.nearClip = camera.nearClip;
@@ -346,14 +402,7 @@ export class ReflectionProbe {
         this.camera.resize(camera.width, camera.height);
     }
 
-    public updateBoundingBox () {
-        if (this.node) {
-            const pos = this.node.getWorldPosition();
-            geometry.AABB.set(this._boundingBox!, pos.x, pos.y, pos.z, this._size.x, this._size.y, this._size.z);
-        }
-    }
-
-    private _createCamera (cameraNode:Node) {
+    private _createCamera (cameraNode: Node) {
         const root = cclegacy.director.root;
         if (!this._camera) {
             this._camera = (cclegacy.director.root).createCamera();
@@ -429,7 +478,13 @@ export class ReflectionProbe {
         this.cameraNode.worldRotation = this._cameraWorldRotation;
 
         this.camera.update(true);
+
+        // Transform the plane from world space to reflection camera space use the inverse transpose matrix
+        const viewSpaceProbe = new Vec4(Vec3.UP.x, Vec3.UP.y, Vec3.UP.z, -Vec3.dot(Vec3.UP, this.node.worldPosition));
+        viewSpaceProbe.transformMat4(this.camera.matView.clone().invert().transpose());
+        this.camera.calculateObliqueMat(viewSpaceProbe);
     }
+
     private _reflect (out: Vec3, point: Vec3, normal: Vec3, offset: number) {
         const n = Vec3.clone(normal);
         n.normalize();
