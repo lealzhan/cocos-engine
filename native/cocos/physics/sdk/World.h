@@ -42,8 +42,7 @@ public:
     void syncSceneWithCheck() override;
     void setCollisionMatrix(uint32_t i, uint32_t m) override;
     ccstd::vector<std::shared_ptr<TriggerEventPair>> &getTriggerEventPairs() override;
-    ccstd::vector<std::shared_ptr<ContactEventPair>>& getContactEventPairs() override;
-    ccstd::vector<std::shared_ptr<CCTShapeEventPair>>& getCCTShapeEventPairs() override;
+    ccstd::vector<std::shared_ptr<ContactEventPair>> &getContactEventPairs() override;
     bool raycast(RaycastOptions &opt) override;
     bool raycastClosest(RaycastOptions &opt) override;
     ccstd::vector<RaycastResult> &raycastResult() override;

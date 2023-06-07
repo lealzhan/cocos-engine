@@ -122,7 +122,6 @@ void PhysXEventManager::refreshPairs() {
     }
 
     getConatctPairs().clear();
-    getCCTShapePairs().clear();
 }
 
 } // namespace physics

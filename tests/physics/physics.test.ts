@@ -16,7 +16,6 @@ import StableTest from "./stability";
 import VolumeTest from "./volume";
 import FilterTest from "./filtering";
 import DynamicTest from "./dynamic";
-import CharacterController from "./characterController";
 import { Node, Scene } from "../../cocos/scene-graph";
 import { builtinResMgr } from "../../exports/base";
 
@@ -77,9 +76,6 @@ for (const id in physics.selector.backend) {
         // test rigid body
         DynamicTest(temp0);
 
-        // test character controller
-        CharacterController(temp0);
-        
         temp0.destroy();
         scene.destroy();
         // all works done

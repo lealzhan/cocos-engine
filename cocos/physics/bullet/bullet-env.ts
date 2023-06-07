@@ -40,8 +40,5 @@ export const importFunc = {
         body.syncPhysicsToGraphics();
     },
     onShapeHitExt (hit: number, controller: number) {
-        const bt = globalThis.Bullet;
-        const cct = bt.CACHE.getWrapper(controller, bt.CCT_CACHE_NAME);
-        cct.onShapeHitExt(hit);
     },
 };

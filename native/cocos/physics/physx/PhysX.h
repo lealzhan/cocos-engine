@@ -40,6 +40,3 @@
 #include "physics/physx/joints/PhysXFixedJoint.h"
 #include "physics/physx/joints/PhysXRevolute.h"
 #include "physics/physx/joints/PhysXSpherical.h"
-
-#include "physics/physx/character-controllers/PhysXBoxCharacterController.h"
-#include "physics/physx/character-controllers/PhysXCapsuleCharacterController.h"
