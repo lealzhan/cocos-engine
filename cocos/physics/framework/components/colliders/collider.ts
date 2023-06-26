@@ -26,7 +26,7 @@
 import { ccclass, tooltip, displayOrder, displayName, readOnly, type, serializable } from 'cc.decorator';
 import { EDITOR } from 'internal:constants';
 import { Eventify, Vec3, error, geometry } from '../../../../core';
-import { CollisionEventType, TriggerEventType } from '../../physics-interface';
+import { CharacterTriggerEventType, CollisionEventType, TriggerEventType } from '../../physics-interface';
 import { RigidBody } from '../rigid-body';
 import { PhysicsMaterial } from '../../assets/physics-material';
 import { Component, Node } from '../../../../scene-graph';
@@ -248,7 +248,8 @@ export class Collider extends Eventify(Component) {
      * @param callback - The event callback, signature:`(event?:ICollisionEvent|ITriggerEvent)=>void`.
      * @param target - The event callback target.
      */
-    public on<TFunction extends (...any) => void>(type: TriggerEventType | CollisionEventType, callback: TFunction, target?, once?: boolean): any {
+    public on<TFunction extends (...any) => void>(type: TriggerEventType | CollisionEventType | CharacterTriggerEventType,
+        callback: TFunction, target?, once?: boolean): any {
         const ret = super.on(type, callback, target, once);
         this._updateNeedEvent(type);
         return ret;
@@ -263,7 +264,7 @@ export class Collider extends Eventify(Component) {
      * @param callback - The event callback, signature:`(event?:ICollisionEvent|ITriggerEvent)=>void`.
      * @param target - The event callback target.
      */
-    public off (type: TriggerEventType | CollisionEventType, callback?: (...any) => void, target?) {
+    public off (type: TriggerEventType | CollisionEventType | CharacterTriggerEventType, callback?: (...any) => void, target?) {
         super.off(type, callback, target);
         this._updateNeedEvent();
     }
@@ -277,7 +278,8 @@ export class Collider extends Eventify(Component) {
      * @param callback - The event callback, signature:`(event?:ICollisionEvent|ITriggerEvent)=>void`.
      * @param target - The event callback target.
      */
-    public once<TFunction extends (...any) => void>(type: TriggerEventType | CollisionEventType, callback: TFunction, target?): any {
+    public once<TFunction extends (...any) => void>(type: TriggerEventType | CollisionEventType | CharacterTriggerEventType,
+        callback: TFunction, target?): any {
         // TODO: callback invoker now is a entity, after `once` will not calling the upper `off`.
         const ret = super.once(type, callback, target);
         this._updateNeedEvent(type);
@@ -448,7 +450,8 @@ export class Collider extends Eventify(Component) {
                 if (type === 'onCollisionEnter' || type === 'onCollisionStay' || type === 'onCollisionExit') {
                     this._needCollisionEvent = true;
                 }
-                if (type === 'onTriggerEnter' || type === 'onTriggerStay' || type === 'onTriggerExit') {
+                if (type === 'onTriggerEnter' || type === 'onTriggerStay' || type === 'onTriggerExit'
+                    || type === 'onControllerTriggerEnter' || type === 'onControllerTriggerStay' || type === 'onControllerTriggerExit') {
                     this._needTriggerEvent = true;
                 }
             } else {
@@ -459,7 +462,11 @@ export class Collider extends Eventify(Component) {
                 }
                 if (!(this.hasEventListener('onCollisionEnter')
                     || this.hasEventListener('onCollisionStay')
-                    || this.hasEventListener('onCollisionExit'))) {
+                    || this.hasEventListener('onCollisionExit')
+                    || this.hasEventListener('onControllerCollisionEnter')
+                    || this.hasEventListener('onControllerCollisionStay')
+                    || this.hasEventListener('onControllerCollisionExit')
+                )) {
                     this._needCollisionEvent = false;
                 }
             }
