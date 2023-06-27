@@ -26,7 +26,7 @@ import b2 from '@cocos/box2d';
 import { assert, js } from '../../../core';
 import { fastRemove } from '../../../core/utils/array';
 import { Contact2DType, PhysicsSystem2D } from '../../framework';
-import { PhysicsContact } from '../physics-contact';
+import { PhysicsContact, b2ContactExtends } from '../physics-contact';
 import { b2Shape2D } from '../shapes/shape-2d';
 
 /**
@@ -50,8 +50,9 @@ export class PhysicsContactListener extends b2.ContactListener {
         return key;
     }
 
-    BeginContact (contact: b2.Contact) {
-        const key = this.getContactKey(contact);
+    BeginContact (b2contact: b2ContactExtends) {
+        console.log('BeginContact');
+        const key = this.getContactKey(b2contact);
 
         if (PhysicsContactListener._contactMap.has(key)) {
             const retContact = PhysicsContactListener._contactMap.get(key)!;
@@ -62,14 +63,16 @@ export class PhysicsContactListener extends b2.ContactListener {
                 retContact.status = Contact2DType.BEGIN_CONTACT;
             }
         } else {
-            const retCollision = new PhysicsContact(contact);
+            const retCollision = new PhysicsContact(b2contact);
             PhysicsContactListener._contactMap.set(key, retCollision);
             retCollision.status = Contact2DType.BEGIN_CONTACT;
         }
     }
 
-    EndContact (contact: b2.Contact) {
-        const key = this.getContactKey(contact);
+    EndContact (b2contact: b2ContactExtends) {
+        console.log('EndContact');
+
+        const key = this.getContactKey(b2contact);
 
         const retContact = PhysicsContactListener._contactMap.get(key);
         assert(retContact);
@@ -80,16 +83,24 @@ export class PhysicsContactListener extends b2.ContactListener {
         }
     }
 
-    PreSolve (contact: b2.Contact, oldManifold: b2.Manifold) {
+    PreSolve (b2contact: b2ContactExtends, oldManifold: b2.Manifold) {
+        console.log('PreSolve');
+        const c: PhysicsContact = b2contact.m_userData as PhysicsContact;
+        if (c && c.disabled) {
+            //c.setEnabled(!c.disabled);
+            c.setEnabled(false);
+        }
     }
 
-    PostSolve (contact: b2.Contact, impulse: b2.ContactImpulse) {
+    PostSolve (b2contact: b2ContactExtends, impulse: b2.ContactImpulse) {
+        console.log('PostSolve');
     }
 
     public finalizeContactEvent () {
+        console.log('finalizeContactEvent');
         PhysicsContactListener._contactMap.forEach((contact: PhysicsContact, key: string) => {
             // emit collision event
-            if (!contact.disabled || contact.status === Contact2DType.BEGIN_CONTACT) { //BEGIN_CONTACT always emits
+            if (!contact.disabled) {
                 if (contact.status === Contact2DType.END_CONTACT) {
                     this.emit(Contact2DType.END_CONTACT, contact);
                 } else if (contact.status === Contact2DType.BEGIN_CONTACT) {
@@ -98,6 +109,9 @@ export class PhysicsContactListener extends b2.ContactListener {
                     this.emit(Contact2DType.STAY_CONTACT, contact);
                 }
             }
+
+            // //contact status might be modified in callback function of emitted event
+            // contact.setEnabled(!contact.disabled);
 
             // extra processing
             if (contact.status === Contact2DType.END_CONTACT) {
@@ -136,5 +150,8 @@ export class PhysicsContactListener extends b2.ContactListener {
         if ((bodyA && bodyA.enabledContactListener) || (bodyB && bodyB.enabledContactListener) || !bodyA || !bodyB) {
             PhysicsSystem2D.instance.emit(contactType, colliderA, colliderB, contact);
         }
+
+        //contact status might be modified in callback function of emitted event
+        contact.setEnabled(!contact.disabled);
     }
 }

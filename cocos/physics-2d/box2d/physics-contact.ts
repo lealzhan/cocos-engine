@@ -30,6 +30,10 @@ import { Collider2D, Contact2DType, PhysicsSystem2D } from '../framework';
 import { b2Shape2D } from './shapes/shape-2d';
 import { IPhysics2DContact, IPhysics2DImpulse, IPhysics2DManifoldPoint, IPhysics2DWorldManifold } from '../spec/i-physics-contact';
 
+export type b2ContactExtends = b2.Contact & {
+    m_userData: any
+}
+
 const pools: PhysicsContact[] = [];
 
 // temp world manifold
@@ -80,7 +84,7 @@ export class PhysicsContact implements IPhysics2DContact {
 
     private _impulse: b2.ContactImpulse | null = null;
     private _inverted = false;
-    private _b2contact: b2Contact | null = null;
+    private _b2contact: b2ContactExtends | null = null;
 
     _setImpulse (impulse: b2.ContactImpulse | null) {
         this._impulse = impulse;
@@ -96,6 +100,7 @@ export class PhysicsContact implements IPhysics2DContact {
         this._inverted = false;
 
         this._b2contact = b2contact;
+        this._b2contact!.m_userData = this;
     }
 
     reset () {

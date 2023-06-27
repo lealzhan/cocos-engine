@@ -275,7 +275,8 @@ export class PhysicsSystem2D extends Eventify(System) {
         }
 
         director.emit(Director.EVENT_BEFORE_PHYSICS);
-
+        console.log('    ');
+        console.log('--- postUpdate begin ---');
         this.physicsWorld.syncSceneToPhysics();
 
         this._steping = true;
@@ -308,6 +309,8 @@ export class PhysicsSystem2D extends Eventify(System) {
 
         this._steping = false;
         director.emit(Director.EVENT_AFTER_PHYSICS);
+        console.log('--- postUpdate end ---');
+        console.log('    ');
     }
 
     // eslint-disable-next-line @typescript-eslint/ban-types
