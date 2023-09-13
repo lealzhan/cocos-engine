@@ -75,7 +75,7 @@ jest.mock(
 
 // Mock external wasm module here
 [
-    'external:emscripten/bullet/bullet.wasm',
+    'external:emscripten/bullet/bullet.release.wasm.wasm',
     'external:emscripten/webgpu/webgpu_wasm.wasm',
     'external:emscripten/webgpu/glslang.wasm',
     'external:emscripten/physx/physx.release.wasm.wasm',
@@ -101,6 +101,7 @@ jest.mock('external:emscripten/meshopt/meshopt_decoder.wasm.wasm',
 
 // Mock external wasm js module here
 [
+    'external:emscripten/bullet/bullet.release.wasm.js',
     'external:emscripten/webgpu/webgpu_wasm.js',
     'external:emscripten/webgpu/glslang.js',
     'external:emscripten/physx/physx.release.wasm.js',
@@ -132,8 +133,8 @@ jest.mock(
 
 
 jest.mock(
-    'external:emscripten/bullet/bullet.asm.js', 
-    () => jest.requireActual('../native/external/emscripten/bullet/bullet.asm.js'),
+    'external:emscripten/bullet/bullet.release.asm.js', 
+    () => jest.requireActual('../native/external/emscripten/bullet/bullet.release.asm.js'),
     { virtual: true },
 );
 
