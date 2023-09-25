@@ -403,6 +403,12 @@ export enum PhysicsGroup {
 }
 Enum(PhysicsGroup);
 
+/**
+ * @en
+ * Physics Debug Draw Flags.
+ * @zh
+ * 物理调试绘制标志。
+ */
 export enum EPhysicsDrawFlags {
     /**
      * @en
@@ -410,27 +416,27 @@ export enum EPhysicsDrawFlags {
      * @zh
      * 不绘制。
     */
-    None = 0,
+    NONE = 0,
     /**
      * @en
      * Draw wireframe
      * @zh
      * 绘制线框。
     */
-    WireFrame = 0x0001,
+    WIRE_FRAME = 0x0001,
     /**
      * @en
      * Draw Constraint.
      * @zh
      * 绘制约束
     */
-    Constraint = 0x0002,
+    CONSTRAINT = 0x0002,
     /**
      * @en
      * Draw AABB.
      * @zh
      * 绘制包围盒。
     */
-    Aabb = 0x0004,
+    AABB = 0x0004,
 }
 Enum(EPhysicsDrawFlags);
